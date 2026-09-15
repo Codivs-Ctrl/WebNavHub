@@ -9,9 +9,16 @@
 //   - remark : 可选，鼠标悬停显示的备注
 // ===================================================================
 window.NAV_SITES = {
-    "updatedAt": "2026-09-15T12:54:18.305Z",
+    "updatedAt": "2026-09-15T13:16:21.307Z",
     "categories": null,
     "sites": [
+        {
+            "id": 8056622182637,
+            "name": "fsdfsd",
+            "url": "https://fsdfsd",
+            "icon": "",
+            "remark": "vfds"
+        },
         {
             "id": 1001,
             "name": "Gemini",
