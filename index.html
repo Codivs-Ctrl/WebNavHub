@@ -213,6 +213,15 @@
         .sync-ok { color: #34a853; }
         .sync-warn { color: #fbbc05; }
         .sync-err { color: #ff6b6b; }
+        /* 本机文件同步状态胶囊：一眼看出是否已接入 */
+        #local-sync-pill { display: inline-flex; align-items: center; gap: 6px; }
+        #local-sync-pill .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ff6b6b; box-shadow: 0 0 6px rgba(255,107,107,0.8);
+            flex-shrink: 0;
+        }
+        #local-sync-pill.on .dot { background: #34a853; box-shadow: 0 0 6px rgba(52,168,83,0.9); }
+        #local-sync-pill.warn .dot { background: #fbbc05; box-shadow: 0 0 6px rgba(251,188,5,0.9); }
         .modal-content textarea {
             width: 100%; box-sizing: border-box; margin: 10px 0; padding: 12px;
             background: #1a1a1a; color: #d4d4d4; border: 1px solid #444; border-radius: 8px;
@@ -426,6 +435,9 @@
 </div>
 
 <div class="top-bar">
+    <button onclick="openSyncModal()" id="local-sync-pill" title="本机文件同步状态，点击配置">
+        <span class="dot"></span><span id="local-sync-pill-text">本机文件</span>
+    </button>
     <button onclick="openSiteModal()">+ 添加站点</button>
     <button onclick="openModal('bg-modal')">🖼️ 背景</button>
     <button onclick="openSyncModal()">🔄 云同步</button>
@@ -1742,7 +1754,7 @@
 
                         // 云端为准：已绑定本机文件时，把最新数据一并写回本机
                         if (isLocalFileSyncEnabled()) {
-                            writeLocalFile(buildDataFileContent(siteStore), true);
+                            writeLocalFile(buildDataFileContent(siteStore), true, true);
                         }
 
                         console.info('[NavHub] 已从 GitHub 载入最新站点数据');
@@ -1904,6 +1916,73 @@
         }
     }
 
+    // 顶部胶囊：把「本机文件同步」的状态做成随页面常驻的指示，一眼可见
+    function updateLocalSyncPill() {
+        const pill = document.getElementById('local-sync-pill');
+        const text = document.getElementById('local-sync-pill-text');
+        if (!pill || !text) return;
+
+        pill.classList.remove('on', 'warn');
+
+        if (!supportsLocalFileSync()) {
+            pill.classList.add('warn');
+            text.textContent = '本机文件：不支持';
+            pill.title = '当前浏览器不支持直接写本机文件（需 Chrome / Edge 88+）。\n'
+                + '可改用 tools/sync-local.ps1 从仓库拉取。点击查看详情。';
+            return;
+        }
+
+        const cfg = getLocalFileConfig();
+
+        if (isLocalFileSyncEnabled()) {
+            pill.classList.add('on');
+            text.textContent = '本机文件：已接入';
+            pill.title = '✅ 站点改动会同时写入本机「' + localFileHandle.name + '」与云端仓库。\n点击可查看 / 修改设置。';
+        } else if (localFileHandle && cfg.name) {
+            pill.classList.add('warn');
+            text.textContent = '本机文件：待授权';
+            pill.title = '⚠️ 已选中「' + localFileHandle.name + '」但未获写入权限。\n'
+                + '点击打开设置，再点「🔓 授权写入」。';
+        } else if (cfg.name) {
+            pill.classList.add('warn');
+            text.textContent = '本机文件：需重绑';
+            pill.title = '⚠️ 上次绑定的是「' + cfg.name + '」，浏览器要求重新选择一次文件。\n'
+                + '点击打开设置，再点「📎 绑定本机 data/sites.js」。';
+        } else {
+            text.textContent = '本机文件：未绑定';
+            pill.title = '❗ 站点改动目前只写入云端仓库与本机浏览器缓存，本机 data/sites.js 不会变。\n'
+                + '点击打开设置，点「📎 绑定本机 data/sites.js」即可双写。';
+        }
+    }
+
+    // 在控制台执行 __navhubDiag() 可输出两份通道的完整状态，便于排查
+    window.__navhubDiag = function () {
+        const cfg = getLocalFileConfig();
+        const info = {
+            '页面协议': location.protocol,
+            '安全上下文': window.isSecureContext,
+            '支持写本机文件': supportsLocalFileSync(),
+            '已拿到文件句柄': !!localFileHandle,
+            '句柄文件名': localFileHandle ? localFileHandle.name : '(无)',
+            '自动写入开关': cfg.enabled,
+            '记录的文件名': cfg.name || '(无)',
+            '云同步已启用': isSyncEnabled(),
+            '站点数量': Array.isArray(siteStore) ? siteStore.length : 0
+        };
+        console.table(info);
+        if (!supportsLocalFileSync()) {
+            console.warn('本浏览器不支持 File System Access API。');
+        } else if (!localFileHandle) {
+            console.warn('尚未绑定本机文件：这是「本机 sites.js 不更新」的最常见原因。\n'
+                + '点击右上角「本机文件」按钮 → 「📎 绑定本机 data/sites.js」。');
+        } else if (!cfg.enabled) {
+            console.warn('已绑定但自动写入未开启：勾选弹窗内「站点改动时自动写入本机文件」。');
+        } else {
+            console.info('两条通道均已就绪。');
+        }
+        return info;
+    };
+
     // ==================== 本机文件同步（File System Access API） ====================
     // 目标：站点改动时「云端仓库」与「本机 data/sites.js」同时更新。
     //   · 云端：走 GitHub Contents API（见下方 pushSitesToGitHub）
@@ -1915,6 +1994,7 @@
     let localFileHandle = null;    // FileSystemFileHandle（只在当前页面会话内有效）
     let localFileWriting = false;  // 写入串行锁，避免并发写入互相覆盖
     let localFilePending = false;  // 写入期间又有新改动，写完后再补一次
+    let localFilePendingText = null; // 待补写的内容（优先写最新一份，避免丢改动）
 
     function supportsLocalFileSync() {
         return typeof window.showSaveFilePicker === 'function';
@@ -1989,6 +2069,7 @@
         }
 
         updateLocalFileUI();
+        updateLocalSyncPill();
     }
 
     function saveLocalFileConfig(patch) {
@@ -1998,6 +2079,7 @@
             name: next.name || ''
         }));
         updateLocalFileUI();
+        updateLocalSyncPill();
     }
 
     // 「本机文件同步」是否处于可用且已开启状态
@@ -2049,14 +2131,16 @@
     }
 
     // 写入本机文件；force=true 时忽略「自动写入」开关（用于「立即写入本机」）
-    async function writeLocalFile(text, force) {
+    // silent=true 时不单独提示结果，由调用方（persistSites）统一汇总两个通道的状态
+    async function writeLocalFile(text, force, silent = false) {
         if (!localFileHandle) return false;
         if (!force && !isLocalFileSyncEnabled()) return false;
 
-        // 写入期间又来了新改动：打标记，写完后再补一次，保证最终一致
+        // 写入期间又来了新改动：排队补写，并视为本次已受理（否则会被误判为写入失败）
         if (localFileWriting) {
             localFilePending = true;
-            return false;
+            localFilePendingText = text;
+            return true;
         }
 
         localFileWriting = true;
@@ -2064,7 +2148,7 @@
             const perm = await localFileHandle.queryPermission({ mode: 'readwrite' });
             if (perm !== 'granted') {
                 saveLocalFileConfig({ enabled: false });
-                setSyncStatus('本机文件未授权，已暂停自动写入', 'err', 6000);
+                if (!silent) setSyncStatus('本机文件未授权，已暂停自动写入', 'err', 6000);
                 return false;
             }
 
@@ -2072,17 +2156,19 @@
             await writable.write(text);
             await writable.close();
 
-            setSyncStatus('💾 已写入本机 data/sites.js', 'ok', 3000);
+            if (!silent) setSyncStatus('💾 已写入本机 data/sites.js', 'ok', 3000);
             return true;
         } catch (e) {
             console.error('[NavHub] 写入本机文件失败:', e);
-            setSyncStatus('⚠️ 本机文件写入失败，请重新绑定', 'err', 6000);
+            if (!silent) setSyncStatus('⚠️ 本机文件写入失败，请重新绑定', 'err', 6000);
             return false;
         } finally {
             localFileWriting = false;
             if (localFilePending) {
                 localFilePending = false;
-                writeLocalFile(buildDataFileContent(siteStore || []), true);
+                const pending = localFilePendingText;
+                localFilePendingText = null;
+                writeLocalFile(pending || buildDataFileContent(siteStore || []), true, silent);
             }
         }
     }
@@ -2101,14 +2187,27 @@
         if (btn) { btn.disabled = true; btn.textContent = '选择文件中…'; }
 
         try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: 'sites.js',
-                types: [{ description: 'JavaScript 数据文件', accept: { 'text/javascript': ['.js'] } }]
-            });
+            // 用「打开」对话框而不是 showSaveFilePicker：
+            // 后者是「另存为」，指向已存在的 sites.js 时容易被浏览器建成新文件，
+            // 导致改动写不到真正的 data/sites.js 上。
+            let handle = null;
+            if (typeof window.showOpenFilePicker === 'function') {
+                const picked = await window.showOpenFilePicker({
+                    multiple: false,
+                    types: [{ description: 'JavaScript 数据文件', accept: { 'text/javascript': ['.js'] } }]
+                });
+                handle = Array.isArray(picked) ? picked[0] : picked;
+            } else {
+                handle = await window.showSaveFilePicker({
+                    suggestedName: 'sites.js',
+                    types: [{ description: 'JavaScript 数据文件', accept: { 'text/javascript': ['.js'] } }]
+                });
+            }
 
+            if (!handle) return;
             localFileHandle = handle;
 
-            // 选择文件时通常已带 readwrite 授权；没有则请用户手动授权一次
+            // 选中的文件需要显式申请读写权限
             let perm = await handle.queryPermission({ mode: 'readwrite' });
             if (perm !== 'granted') {
                 perm = await handle.requestPermission({ mode: 'readwrite' });
@@ -2119,10 +2218,16 @@
 
             if (perm === 'granted') {
                 saveLocalFileConfig({ enabled: true, name: handle.name });
-                setSyncStatus('本机文件已绑定', 'ok', 3000);
-                alert('✅ 已绑定本机文件：' + handle.name + '\n\n'
-                    + '之后每次添加 / 编辑 / 删除 / 拖拽排序站点，都会同时写入该文件与 GitHub 仓库。\n'
-                    + '建议再点一次「✍️ 立即写入本机」，让本机文件与当前页面数据完全一致。');
+                updateLocalFileUI();
+
+                // 立即写入一次：让用户当场看到「本机文件确实被更新了」，而不是等到下次改站点
+                const written = await writeLocalFile(buildDataFileContent(siteStore || []), true, true);
+
+                alert('✅ 已绑定并写入本机文件：' + handle.name + '\n\n'
+                    + (written
+                        ? '当前站点数据已写入该文件。\n'
+                        : '但本次写入未成功，请检查该文件是否被其它程序占用。\n')
+                    + '之后每次添加 / 编辑 / 删除 / 拖拽排序站点，都会同时写入该文件与 GitHub 仓库。');
             } else {
                 saveLocalFileConfig({ enabled: false, name: handle.name });
                 alert('已选中「' + handle.name + '」，但未获得写入权限。\n\n请点击「🔓 授权写入」完成授权。');
@@ -2135,6 +2240,7 @@
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '📎 绑定本机 data/sites.js'; }
             updateLocalFileUI();
+            updateLocalSyncPill();
         }
     }
 
@@ -2156,6 +2262,7 @@
             alert('❌ 授权失败：' + (e && e.message ? e.message : e));
         } finally {
             updateLocalFileUI();
+            updateLocalSyncPill();
         }
     }
 
@@ -2191,6 +2298,7 @@
 
         localFileHandle = null;
         localFilePending = false;
+        localFilePendingText = null;
         saveLocalFileConfig({ enabled: false, name: '' });
         putLocalFileHandle(null);
         setSyncStatus('已解除本机文件绑定', 'warn', 3000);
@@ -2268,7 +2376,8 @@
     }
 
     // 把当前站点列表提交到 GitHub（带重试与冲突自动合并）
-    async function pushSitesToGitHub(sites, attempt = 1) {
+    // silent=true 时不单独提示结果，由调用方（persistSites）统一汇总两个通道的状态
+    async function pushSitesToGitHub(sites, attempt = 1, silent = false) {
         const cfg = getSyncConfig();
         if (!isSyncEnabled()) return false;
 
@@ -2300,7 +2409,8 @@
             });
 
             if (res.ok) {
-                setSyncStatus('☁️ 已同步到仓库', 'ok', 3000);
+                // silent 时交由 persistSites 汇总，避免只提示「已同步到仓库」而漏掉本机文件
+                if (!silent) setSyncStatus('☁️ 已同步到仓库', 'ok', 3000);
                 return true;
             }
 
@@ -2323,15 +2433,15 @@
                             siteStore = merged;
                             cacheSites();
                             if (isLocalFileSyncEnabled()) {
-                                writeLocalFile(buildDataFileContent(merged), true);
+                                writeLocalFile(buildDataFileContent(merged), true, silent);
                             }
                             render();
                         }
 
-                        return pushSitesToGitHub(merged, attempt + 1);
+                        return pushSitesToGitHub(merged, attempt + 1, silent);
                     }
                 }
-                return pushSitesToGitHub(sites, attempt + 1);
+                return pushSitesToGitHub(sites, attempt + 1, silent);
             }
 
             const detail = await res.text().catch(() => '');
@@ -2339,7 +2449,7 @@
 
         } catch (e) {
             console.error('[NavHub] 云端同步失败:', e);
-            setSyncStatus('⚠️ 同步失败，已存本地', 'err', 6000);
+            if (!silent) setSyncStatus('⚠️ 同步失败，已存本地', 'err', 6000);
             return false;
         }
     }
@@ -2360,12 +2470,12 @@
 
         const jobs = [];
         if (cloudOn) {
-            jobs.push(pushSitesToGitHub(siteStore)
+            jobs.push(pushSitesToGitHub(siteStore, 1, true)
                 .then(ok => ({ cloud: !!ok }))
                 .catch(() => ({ cloud: false })));
         }
         if (localOn) {
-            jobs.push(writeLocalFile(buildDataFileContent(siteStore || []))
+            jobs.push(writeLocalFile(buildDataFileContent(siteStore || []), false, true)
                 .then(ok => ({ local: !!ok }))
                 .catch(() => ({ local: false })));
         }
@@ -2701,6 +2811,7 @@
 
         // 恢复上次绑定的本机文件句柄（权限仍有效时即可继续自动写入）
         await restoreLocalFileHandle();
+        updateLocalSyncPill();
 
         // 先用手头数据渲染，避免白屏；随后加载/拉取最新数据再刷新
         const cachedSites = readJSON(SITES_KEY, null);
