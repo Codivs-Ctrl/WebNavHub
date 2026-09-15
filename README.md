@@ -42,6 +42,8 @@ WebNavHub/
 ├── index.html                # 全部逻辑（HTML + CSS + JS 内联）
 ├── data/
 │   └── sites.js              # 站点数据（永久保存的站点列表）
+├── tools/
+│   └── sync-local.ps1        # 可选：本机数据文件与云端互同步脚本
 ├── image0.webp               # 默认背景
 ├── alimail.webp              # 阿里邮箱图标
 ├── google-brand-color.webp   # Google Logo
@@ -75,7 +77,7 @@ WebNavHub/
 |---|---|
 | `+ 添加站点` | 新增一个快捷站点 |
 | `🖼️ 背景` | 设置背景（本地上传 / 网络图片 / 纯色 / 恢复默认） |
-| `🔄 云同步` | 配置 GitHub 令牌，开启站点数据永久保存 |
+| `🔄 云同步` | 配置 GitHub 令牌并绑定本机 `data/sites.js`，开启站点数据永久保存 |
 | `💾 备份` | 导出全部配置为 JSON 文件 |
 | `📂 恢复` | 从备份文件导入配置 |
 | `⚙️ 管理` | 进入编辑模式，显示站点的编辑 / 删除按钮，并启用拖拽排序 |
@@ -108,6 +110,46 @@ WebNavHub/
 - 页面加载时优先从 GitHub 拉取最新数据（保证跨设备一致），失败则回退本地缓存与打包文件。
 - 提交遇到 `409`（别处刚改过）会自动读取远端并合并后重试，不会覆盖掉别的设备新增的站点。
 - 同步失败时数据仍会保存在本机，底部提示「⚠️ 同步失败，已存本地」，不会丢改动。
+
+### 让本机 `data/sites.js` 也一起更新
+
+云同步只负责仓库里的文件；**本机的 `data/sites.js` 不会自动跟着变**。有两种办法让两边同时更新：
+
+**方式一：页面里绑定本机文件（推荐，实时双写）**
+
+1. 用 Chrome / Edge（88+）打开页面。建议先用 `python -m http.server 5500` 起个本地服务，再访问 `http://localhost:5500`——`file://` 下浏览器会禁用本地文件写入能力。
+2. 打开「🔄 云同步」→ 下方「💾 本机文件同步」→ 点「📎 绑定本机 data/sites.js」。
+3. 在文件选择框里选中本仓库的 `data/sites.js`，浏览器会请求一次写入权限，允许即可。
+4. 勾选「站点改动时自动写入本机文件」（授权成功时默认已勾选）。可点「✍️ 立即写入本机」把当前数据立刻写一次。
+
+之后每次「添加 / 编辑 / 删除 / 拖拽排序」站点都会**同时**提交仓库并写入本机文件，底部状态会显示「☁️💾 已同步到仓库与本机 data/sites.js」。
+
+说明：
+
+- 本机文件写入使用 File System Access API，仅 Chrome / Edge 88+ 支持；Firefox / Safari 下该区块会提示不可用，其余功能不受影响。
+- 文件句柄保存在浏览器 IndexedDB 中，刷新页面会自动恢复；若浏览器要求重新授权，点「🔓 授权写入」即可。
+- 页面加载时若发现云端有更新，也会把最新数据一并写回已绑定的本机文件。
+- 只写本机文件、不配令牌也可以（仅勾选本机文件同步）。
+
+**方式二：用 `tools/sync-local.ps1` 从云端拉回（兜底）**
+
+适合浏览器不支持、或希望无人值守同步的场景：
+
+```powershell
+# 拉回一次（本机文件会被云端覆盖，旧文件自动备份为 data/sites.js.bak）
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local.ps1
+
+# 每 30 秒检查一次，云端有更新就写回本机（前台常驻，Ctrl+C 退出）
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local.ps1 -Watch
+
+# 反向：本机文件有改动时提交并推送到仓库
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local.ps1 -Push
+
+# 私有仓库需带令牌（Contents: Read and write），也可用环境变量 NAVHUB_TOKEN
+powershell -ExecutionPolicy Bypass -File .\tools\sync-local.ps1 -Token github_pat_xxx
+```
+
+> 页面里的「本机文件同步」与脚本是两套独立通道，按需二选一即可；同时开启也不会冲突。
 
 ### `data/sites.js` 格式
 
@@ -183,6 +225,7 @@ const CONFIG = {
 | `cfg_vfinal_bg` / `cfg_vfinal_bg_type` | 自定义背景值 / 类型（`img` \| `color`） |
 | `nav_usage_map` | 站点点击次数 `{ url: count }` |
 | `cfg_github_sync` | 云同步配置 `{ repo, branch, token }`（令牌仅存本机） |
+| `cfg_local_file_sync` | 本机文件同步开关与文件名 `{ enabled, name }`（文件句柄存于 IndexedDB） |
 | `cfg_data_file_ts` | 已加载数据文件的时间戳，用于识别文件被手工改动 |
 
 站点 id 建议保持唯一；`newId()` 生成的是 1e12 起的随机数，手工新增站点时沿用同样的量级即可避免冲突。
@@ -191,9 +234,21 @@ const CONFIG = {
 
 ## 常见问题
 
-**Q：添加的站点显示「已存本地（云同步未开启）」，会丢吗？**
+**Q：添加的站点显示「已存本地（云同步与本机文件同步均未开启）」，会丢吗？**
 
 不会立刻丢，但**换浏览器、换设备或清理浏览器数据后会消失**，因为数据只在本机。要永久保存，按上面的「开启云同步」配置一次即可。
+
+**Q：云同步里的改动确实进了仓库，为什么本机 `data/sites.js` 没变？**
+
+云同步只写仓库文件，不会去动你磁盘上的文件（浏览器也没有这个权限）。要本机文件同时更新，见上文「让本机 `data/sites.js` 也一起更新」：在「🔄 云同步」里绑定本机文件，或用 `tools/sync-local.ps1` 拉回。
+
+**Q：点「📎 绑定本机 data/sites.js」没有反应 / 提示浏览器不支持？**
+
+需要 Chrome / Edge 88+，并且通过 `http://localhost` 或 `https://` 访问页面。若以 `file://` 双击打开，浏览器会禁掉本地文件写入能力——用 `python -m http.server 5500` 起个服务再访问即可；也可直接用 `tools/sync-local.ps1` 替代。
+
+**Q：刷新页面后本机文件同步变成了「需重新绑定」？**
+
+浏览器为安全起见会收回持久权限。点「🔓 授权写入」重新授权即可，文件句柄本身仍保存在浏览器中，无需重新选文件。
 
 **Q：配置了云同步，但改动没进仓库？**
 
