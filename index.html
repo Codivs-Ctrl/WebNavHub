@@ -1713,9 +1713,11 @@
     }
 
     // 生成 data/sites.js 的文件内容
-    function buildDataFileContent(sites) {
+    // updatedAt 可显式传入：同一次改动要让「云端」与「本机文件」写入完全一致的字节，
+    // 否则两侧时间戳相差几毫秒，会让 git 始终显示 data/sites.js 已修改（pull 不干净）。
+    function buildDataFileContent(sites, updatedAt) {
         const payload = {
-            updatedAt: new Date().toISOString(),
+            updatedAt: updatedAt || new Date().toISOString(),
             categories: categories,
             sites: sites
         };
@@ -1752,9 +1754,9 @@
                         markFileTimestamp(parsed.updatedAt);
                         cacheSites();
 
-                        // 云端为准：已绑定本机文件时，把最新数据一并写回本机
+                        // 云端为准：已绑定本机文件时，直接写入远端原文，保证两边字节一致
                         if (isLocalFileSyncEnabled()) {
-                            writeLocalFile(buildDataFileContent(siteStore), true, true);
+                            writeLocalFile(content, true, true);
                         }
 
                         console.info('[NavHub] 已从 GitHub 载入最新站点数据');
@@ -2377,11 +2379,12 @@
 
     // 把当前站点列表提交到 GitHub（带重试与冲突自动合并）
     // silent=true 时不单独提示结果，由调用方（persistSites）统一汇总两个通道的状态
-    async function pushSitesToGitHub(sites, attempt = 1, silent = false) {
+    // updatedAt 由调用方传入，保证与本机文件写入的字节完全一致
+    async function pushSitesToGitHub(sites, attempt = 1, silent = false, updatedAt = null) {
         const cfg = getSyncConfig();
         if (!isSyncEnabled()) return false;
 
-        const content = buildDataFileContent(sites);
+        const content = buildDataFileContent(sites, updatedAt);
         const url = dataFileApiUrl(cfg, false);
         const headers = authHeaders(cfg);
 
@@ -2433,15 +2436,15 @@
                             siteStore = merged;
                             cacheSites();
                             if (isLocalFileSyncEnabled()) {
-                                writeLocalFile(buildDataFileContent(merged), true, silent);
+                                writeLocalFile(buildDataFileContent(merged, updatedAt), true, silent);
                             }
                             render();
                         }
 
-                        return pushSitesToGitHub(merged, attempt + 1, silent);
+                        return pushSitesToGitHub(merged, attempt + 1, silent, updatedAt);
                     }
                 }
-                return pushSitesToGitHub(sites, attempt + 1, silent);
+                return pushSitesToGitHub(sites, attempt + 1, silent, updatedAt);
             }
 
             const detail = await res.text().catch(() => '');
@@ -2468,14 +2471,18 @@
 
         setSyncStatus(cloudOn && localOn ? '☁️💾 同步中…' : cloudOn ? '☁️ 同步中…' : '💾 写入本机文件中…', 'warn');
 
+        // 只生成一次时间戳并传给两条通道：写入的字节完全相同，
+        // git 才能在云同步后干净地 pull（否则两侧 updatedAt 差几毫秒，文件永远显示为已修改）
+        const stamp = new Date().toISOString();
+
         const jobs = [];
         if (cloudOn) {
-            jobs.push(pushSitesToGitHub(siteStore, 1, true)
+            jobs.push(pushSitesToGitHub(siteStore, 1, true, stamp)
                 .then(ok => ({ cloud: !!ok }))
                 .catch(() => ({ cloud: false })));
         }
         if (localOn) {
-            jobs.push(writeLocalFile(buildDataFileContent(siteStore || []), false, true)
+            jobs.push(writeLocalFile(buildDataFileContent(siteStore || [], stamp), false, true)
                 .then(ok => ({ local: !!ok }))
                 .catch(() => ({ local: false })));
         }
