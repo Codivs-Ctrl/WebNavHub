@@ -51,7 +51,7 @@
         }
         @media (max-width: 950px) {
             #memo-container {
-                margin-top: 150px !important; 
+                margin-top: 150px;
                 transition: 0.3s;
                 }
             .grid { grid-template-columns: repeat(4, 1fr); }
@@ -74,7 +74,7 @@
                  margin: 10px 0 10px 20px !important; 
                 }
             #memo-container {
-                margin-top: 10px !important; 
+                margin-top: 24px;
                 }
             #memo-input {
                 min-height: 90px !important;
@@ -213,15 +213,15 @@
         .sync-ok { color: #34a853; }
         .sync-warn { color: #fbbc05; }
         .sync-err { color: #ff6b6b; }
-        /* 本机文件同步状态胶囊：一眼看出是否已接入 */
-        #local-sync-pill { display: inline-flex; align-items: center; gap: 6px; }
-        #local-sync-pill .dot {
+        /* 同步状态浮标：圆点绿色=已接入，红色=未接入，黄色=需要处理 */
+        .sync-pill { display: inline-flex; align-items: center; gap: 6px; }
+        .sync-pill .dot {
             width: 8px; height: 8px; border-radius: 50%;
-            background: #ff6b6b; box-shadow: 0 0 6px rgba(255,107,107,0.8);
+            background: #ff5252; box-shadow: 0 0 6px rgba(255,82,82,0.85);
             flex-shrink: 0;
         }
-        #local-sync-pill.on .dot { background: #34a853; box-shadow: 0 0 6px rgba(52,168,83,0.9); }
-        #local-sync-pill.warn .dot { background: #fbbc05; box-shadow: 0 0 6px rgba(251,188,5,0.9); }
+        .sync-pill.on .dot { background: #34a853; box-shadow: 0 0 6px rgba(52,168,83,0.9); }
+        .sync-pill.warn .dot { background: #fbbc05; box-shadow: 0 0 6px rgba(251,188,5,0.9); }
         .modal-content textarea {
             width: 100%; box-sizing: border-box; margin: 10px 0; padding: 12px;
             background: #1a1a1a; color: #d4d4d4; border: 1px solid #444; border-radius: 8px;
@@ -349,6 +349,8 @@
             transform: none;
             box-shadow: var(--icon-shadow);
         }
+        /* 备忘录：上边距默认值，JS 会在顶栏变高时自动撑开，避免提示语被浮标遮住 */
+        #memo-container { margin-left: auto; margin-right: auto; margin-top: 112px; }
         /* 主题模式 */
         body.dark {
             --bg-glass: rgba(255,255,255,0.12);
@@ -419,7 +421,7 @@
 </div>
 
 <div class="signature-fixed" style="font-size: 14px; opacity: 0.8;">“ 生活明朗，万物可爱 ”</div>
-<div id="memo-container" style="margin: 40px auto 0; width: 95%; max-width: 600px;">
+<div id="memo-container" style="width: 95%; max-width: 600px;">
     <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-size: 14px; color: #8ab4f8; font-weight: bold; opacity: 0.8; white-space: nowrap;">📝 备忘录</span>
         <span id="save-status" style="font-size: 12px; opacity: 0; transition: 0.3s; color: #34a853; margin-left: 10px; white-space: nowrap;">已存入</span>
@@ -435,12 +437,14 @@
 </div>
 
 <div class="top-bar">
-    <button onclick="openSyncModal()" id="local-sync-pill" title="本机文件同步状态，点击配置">
-        <span class="dot"></span><span id="local-sync-pill-text">本机文件</span>
+    <button onclick="openSyncModal()" class="sync-pill" id="cloud-sync-pill" title="云同步状态，点击配置">
+        <span class="dot"></span><span>云同步</span>
+    </button>
+    <button onclick="openSyncModal()" class="sync-pill" id="local-sync-pill" title="本机文件同步状态，点击配置">
+        <span class="dot"></span><span>本机同步</span>
     </button>
     <button onclick="openSiteModal()">+ 添加站点</button>
     <button onclick="openModal('bg-modal')">🖼️ 背景</button>
-    <button onclick="openSyncModal()">🔄 云同步</button>
     <button onclick="exportData()">💾 备份</button>
     <button onclick="document.getElementById('import-file').click()">📂 恢复</button>
     <input type="file" id="import-file" class="hidden" onchange="importData(event)">
@@ -1918,43 +1922,87 @@
         }
     }
 
-    // 顶部胶囊：把「本机文件同步」的状态做成随页面常驻的指示，一眼可见
-    function updateLocalSyncPill() {
-        const pill = document.getElementById('local-sync-pill');
-        const text = document.getElementById('local-sync-pill-text');
-        if (!pill || !text) return;
+    // 将某个浮标设为指定状态：on=绿色（已接入）、warn=黄色（需处理）、默认=红色（未接入）
+    function setPill(id, state, text, title) {
+        const pill = document.getElementById(id);
+        if (!pill) return;
 
         pill.classList.remove('on', 'warn');
+        if (state === 'on') pill.classList.add('on');
+        else if (state === 'warn') pill.classList.add('warn');
 
+        const label = pill.querySelector('span:last-child');
+        if (label && text) label.textContent = text;
+        if (title) pill.title = title;
+    }
+
+    // 顶部两个浮标：云同步 + 本机文件同步（圆点绿=已接入，红=未接入，黄=需处理）
+    function updateSyncPills() {
+        updateCloudSyncPill();
+        updateLocalFileSyncPill();
+    }
+
+    function updateCloudSyncPill() {
+        const cfg = getSyncConfig();
+
+        // 注意：CONFIG.sync.repo 带有内置默认值，不能拿它判断「用户是否配置过」，
+        // 否则永远会被判为「已填写仓库」，浮标就无法显示红色未接入状态。
+        const saved = readJSON(SYNC_KEY, null) || {};
+        const userRepo = String(saved.repo || '').trim();
+
+        if (cfg.token) {
+            setPill('cloud-sync-pill', 'on', '云同步',
+                '✅ 云同步已接入：站点改动会自动提交到 ' + (userRepo || cfg.repo) + ' 的 ' + cfg.path + '。\n'
+                + '点击可查看 / 修改设置。');
+            return;
+        }
+
+        if (userRepo) {
+            setPill('cloud-sync-pill', 'warn', '云同步',
+                '⚠️ 已填写仓库 ' + userRepo + '，但缺少 GitHub 访问令牌，云同步未生效。\n'
+                + '点击打开设置，填入令牌后点「保存」。');
+            return;
+        }
+
+        setPill('cloud-sync-pill', '', '云同步',
+            '❗ 云同步未接入：站点改动不会提交到仓库，换设备或清缓存会丢失。\n'
+            + '点击打开设置，填写仓库与令牌。');
+    }
+
+    function updateLocalFileSyncPill() {
         if (!supportsLocalFileSync()) {
-            pill.classList.add('warn');
-            text.textContent = '本机文件：不支持';
-            pill.title = '当前浏览器不支持直接写本机文件（需 Chrome / Edge 88+）。\n'
-                + '可改用 tools/sync-local.ps1 从仓库拉取。点击查看详情。';
+            setPill('local-sync-pill', 'warn', '本机同步',
+                '当前浏览器不支持直接写本机文件（需 Chrome / Edge 88+）。\n'
+                + '可改用 tools/sync-local.ps1 从仓库拉取。点击查看详情。');
             return;
         }
 
         const cfg = getLocalFileConfig();
 
         if (isLocalFileSyncEnabled()) {
-            pill.classList.add('on');
-            text.textContent = '本机文件：已接入';
-            pill.title = '✅ 站点改动会同时写入本机「' + localFileHandle.name + '」与云端仓库。\n点击可查看 / 修改设置。';
-        } else if (localFileHandle && cfg.name) {
-            pill.classList.add('warn');
-            text.textContent = '本机文件：待授权';
-            pill.title = '⚠️ 已选中「' + localFileHandle.name + '」但未获写入权限。\n'
-                + '点击打开设置，再点「🔓 授权写入」。';
-        } else if (cfg.name) {
-            pill.classList.add('warn');
-            text.textContent = '本机文件：需重绑';
-            pill.title = '⚠️ 上次绑定的是「' + cfg.name + '」，浏览器要求重新选择一次文件。\n'
-                + '点击打开设置，再点「📎 绑定本机 data/sites.js」。';
-        } else {
-            text.textContent = '本机文件：未绑定';
-            pill.title = '❗ 站点改动目前只写入云端仓库与本机浏览器缓存，本机 data/sites.js 不会变。\n'
-                + '点击打开设置，点「📎 绑定本机 data/sites.js」即可双写。';
+            setPill('local-sync-pill', 'on', '本机同步',
+                '✅ 本机同步已接入：站点改动会同时写入本机「' + localFileHandle.name + '」与云端仓库。\n'
+                + '点击可查看 / 修改设置。');
+            return;
         }
+
+        if (localFileHandle && cfg.name) {
+            setPill('local-sync-pill', 'warn', '本机同步',
+                '⚠️ 已选中「' + localFileHandle.name + '」但未获写入权限。\n'
+                + '点击打开设置，再点「🔓 授权写入」。');
+            return;
+        }
+
+        if (cfg.name) {
+            setPill('local-sync-pill', 'warn', '本机同步',
+                '⚠️ 上次绑定的是「' + cfg.name + '」，浏览器要求重新选择一次文件。\n'
+                + '点击打开设置，再点「📎 绑定本机 data/sites.js」。');
+            return;
+        }
+
+        setPill('local-sync-pill', '', '本机同步',
+            '❗ 本机同步未接入：站点改动只写入云端仓库与本机浏览器缓存，本机 data/sites.js 不会变。\n'
+            + '点击打开设置，点「📎 绑定本机 data/sites.js」即可双写。');
     }
 
     // 在控制台执行 __navhubDiag() 可输出两份通道的完整状态，便于排查
@@ -2071,7 +2119,7 @@
         }
 
         updateLocalFileUI();
-        updateLocalSyncPill();
+        updateSyncPills();
     }
 
     function saveLocalFileConfig(patch) {
@@ -2081,7 +2129,7 @@
             name: next.name || ''
         }));
         updateLocalFileUI();
-        updateLocalSyncPill();
+        updateSyncPills();
     }
 
     // 「本机文件同步」是否处于可用且已开启状态
@@ -2130,6 +2178,33 @@
             ? '当前状态：上次绑定的是「' + cfg.name + '」，浏览器安全策略要求刷新页面后重新绑定一次。'
             : '当前状态：未绑定本机文件，站点改动只写入云端仓库与本机浏览器缓存。';
         stateEl.style.color = '#fbbc05';
+    }
+
+    // 防止固定顶栏（含两个同步浮标）遮住备忘录提示行：
+    // 按顶栏实际高度与换行行数动态撑开上边距（窄屏下顶栏变相对定位，无需处理）
+    function avoidTopBarOverlap() {
+        const bar = document.querySelector('.top-bar');
+        const memo = document.getElementById('memo-container');
+        if (!bar || !memo) return;
+
+        // 窄屏时顶栏是相对定位（文档流内），不遮挡任何内容，交回 CSS 控制
+        if (getComputedStyle(bar).position !== 'fixed') {
+            memo.style.marginTop = '';
+            return;
+        }
+
+        const items = bar.querySelectorAll('button');
+        if (!items.length) return;
+
+        // 顶栏是右对齐的单行/多行 flex，取所有按钮中最低的那一行底部，作为实际占位高度
+        let lowest = 0;
+        items.forEach(el => { lowest = Math.max(lowest, el.getBoundingClientRect().bottom); });
+
+        // 留出一定余量，避免紧贴
+        const needed = Math.ceil(lowest + 32);
+        const safeMin = 112;   // 与 CSS 默认值保持一致，避免正常宽度下反复改写样式
+
+        memo.style.marginTop = Math.max(needed, safeMin) + 'px';
     }
 
     // 写入本机文件；force=true 时忽略「自动写入」开关（用于「立即写入本机」）
@@ -2242,7 +2317,7 @@
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = '📎 绑定本机 data/sites.js'; }
             updateLocalFileUI();
-            updateLocalSyncPill();
+            updateSyncPills();
         }
     }
 
@@ -2264,7 +2339,7 @@
             alert('❌ 授权失败：' + (e && e.message ? e.message : e));
         } finally {
             updateLocalFileUI();
-            updateLocalSyncPill();
+            updateSyncPills();
         }
     }
 
@@ -2539,7 +2614,6 @@
 
         openModal('sync-modal');
     }
-
     function saveSyncConfig() {
         const repo = (document.getElementById('sync-repo').value || '').trim();
         const branch = (document.getElementById('sync-branch').value || 'main').trim();
@@ -2566,6 +2640,9 @@
             : '已关闭云同步，站点改动只保存在本机浏览器。\n\n注意：这不会解除本机文件同步（如需一并关闭，请取消下方勾选）。');
 
         closeModal('sync-modal');
+
+        // 保存后两个浮标立即反映最新状态
+        updateSyncPills();
 
         // 开启后立即把当前数据同步一次
         if (repo && token) {
@@ -2818,7 +2895,11 @@
 
         // 恢复上次绑定的本机文件句柄（权限仍有效时即可继续自动写入）
         await restoreLocalFileHandle();
-        updateLocalSyncPill();
+        updateSyncPills();
+
+        // 顶栏（含两个同步浮标）为固定定位，动态撑开备忘录上边距避免遮挡
+        avoidTopBarOverlap();
+        window.addEventListener('resize', avoidTopBarOverlap);
 
         // 先用手头数据渲染，避免白屏；随后加载/拉取最新数据再刷新
         const cachedSites = readJSON(SITES_KEY, null);
