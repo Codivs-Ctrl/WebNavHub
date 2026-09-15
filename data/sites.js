@@ -9,16 +9,9 @@
 //   - remark : 可选，鼠标悬停显示的备注
 // ===================================================================
 window.NAV_SITES = {
-    "updatedAt": "2026-09-15T13:16:21.307Z",
+    "updatedAt": "2026-09-15T15:52:33.510Z",
     "categories": null,
     "sites": [
-        {
-            "id": 8056622182637,
-            "name": "fsdfsd",
-            "url": "https://fsdfsd",
-            "icon": "",
-            "remark": "vfds"
-        },
         {
             "id": 1001,
             "name": "Gemini",
@@ -368,6 +361,13 @@ window.NAV_SITES = {
             "url": "https://javmix.tv/",
             "icon": "",
             "remark": "成人视频网站"
+        },
+        {
+            "id": 7345774950799,
+            "name": "3333",
+            "url": "https://3333",
+            "icon": "",
+            "remark": "333"
         }
     ]
 };
