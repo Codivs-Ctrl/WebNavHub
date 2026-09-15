@@ -9,16 +9,9 @@
 //   - remark : 可选，鼠标悬停显示的备注
 // ===================================================================
 window.NAV_SITES = {
-    "updatedAt": "2026-09-15T15:52:33.510Z",
+    "updatedAt": "2026-09-15T15:54:59.100Z",
     "categories": null,
     "sites": [
-        {
-            "id": 1001,
-            "name": "Gemini",
-            "url": "https://gemini.google.com",
-            "icon": "",
-            "remark": "Google 官方 AI 助手"
-        },
         {
             "id": 1002,
             "name": "MSCopilot",
