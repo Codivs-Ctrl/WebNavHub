@@ -437,10 +437,10 @@
 </div>
 
 <div class="top-bar">
-    <button onclick="openSyncModal()" class="sync-pill" id="cloud-sync-pill" title="云同步状态，点击配置">
+    <button onclick="openCloudSyncModal()" class="sync-pill" id="cloud-sync-pill" title="云同步状态，点击配置">
         <span class="dot"></span><span>云同步</span>
     </button>
-    <button onclick="openSyncModal()" class="sync-pill" id="local-sync-pill" title="本机文件同步状态，点击配置">
+    <button onclick="openLocalSyncModal()" class="sync-pill" id="local-sync-pill" title="本机文件同步状态，点击配置">
         <span class="dot"></span><span>本机同步</span>
     </button>
     <button onclick="openSiteModal()">+ 添加站点</button>
@@ -478,11 +478,10 @@
 </div>
 <div id="sync-modal" class="modal">
     <div class="modal-content">
-        <h3>云同步设置</h3>
+        <h3>☁️ 云同步设置</h3>
         <p class="help-text">
             开启后，网页上「添加 / 编辑 / 删除 / 拖拽排序」站点会自动提交到 GitHub 仓库的
             <code>data/sites.js</code>，实现跨浏览器、跨设备的永久保存。
-            若下方「本机文件同步」也已绑定，则同一时刻本机的 <code>data/sites.js</code> 会被一起更新。
         </p>
         <p class="help-text" id="sync-state-text"></p>
         <label style="display:block; margin-top:14px; font-size:13px; color:rgba(255,255,255,0.8);">仓库（owner/repo）</label>
@@ -501,27 +500,36 @@
             <button onclick="saveSyncConfig()" style="padding: 8px 16px; margin-right:8px; background: var(--accent); color:#000; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">保存</button>
             <button onclick="closeModal('sync-modal')" style="padding: 8px 16px; background:none; border:none; color:#fff; cursor:pointer;">关闭</button>
         </div>
-        <div style="margin-top:16px; padding-top:14px; border-top:1px solid #444;">
-            <label style="display:block; font-size:13px; color:rgba(255,255,255,0.8); font-weight:bold;">💾 本机文件同步（直接写回 data/sites.js）</label>
-            <p class="help-text" style="margin-top:6px;">
-                绑定本机的 <code>data/sites.js</code> 后，每次「添加 / 编辑 / 删除 / 拖拽排序」站点
-                都会同时写入该文件，不必再手动复制代码。需要一个支持 File System Access API 的浏览器
-                （Chrome / Edge 88+），并建议用 <code>http://localhost</code> 起服务后访问本页。
-            </p>
-            <p class="help-text" id="local-file-state"></p>
-            <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(255,255,255,0.8); margin-top:8px; cursor:pointer;">
-                <input type="checkbox" id="local-sync-enabled" onchange="setLocalFileEnabled(this.checked)" style="width:auto; margin:0;">
-                站点改动时自动写入本机文件
-            </label>
-            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                <button onclick="bindLocalFile()" id="local-bind-btn" style="padding:8px 14px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">📎 绑定本机 data/sites.js</button>
-                <button onclick="grantLocalFilePermission()" id="local-grant-btn" style="display:none; padding:8px 14px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">🔓 授权写入</button>
-                <button onclick="flushLocalFile()" id="local-flush-btn" style="display:none; padding:8px 14px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">✍️ 立即写入本机</button>
-                <button onclick="unbindLocalFile()" id="local-unbind-btn" style="display:none; padding:8px 14px; background:none; color:#ff8a80; border:1px solid rgba(255,138,128,0.5); border-radius:5px; cursor:pointer;">解除绑定</button>
-            </div>
-        </div>
         <div style="margin-top:14px; padding-top:14px; border-top:1px solid #444; text-align:center;">
             <button onclick="exportSitesCode()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:12px; text-decoration:underline;">不想用令牌？改为手动复制代码保存</button>
+        </div>
+    </div>
+</div>
+<div id="local-sync-modal" class="modal">
+    <div class="modal-content">
+        <h3>💾 本机文件同步</h3>
+        <p class="help-text">
+            绑定本机的 <code>data/sites.js</code> 后，每次「添加 / 编辑 / 删除 / 拖拽排序」站点
+            都会直接写入该文件，不必再手动复制代码。
+        </p>
+        <p class="help-text">
+            需要支持 File System Access API 的浏览器（Chrome / Edge 88+），
+            并建议用 <code>http://localhost</code> 起服务后访问本页。
+            本项可与「云同步」同时开启，两边会同时更新。
+        </p>
+        <p class="help-text" id="local-file-state"></p>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:rgba(255,255,255,0.8); margin-top:12px; cursor:pointer;">
+            <input type="checkbox" id="local-sync-enabled" onchange="setLocalFileEnabled(this.checked)" style="width:auto; margin:0;">
+            站点改动时自动写入本机文件
+        </label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+            <button onclick="bindLocalFile()" id="local-bind-btn" style="padding:8px 14px; background:var(--accent); color:#000; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">📎 绑定本机 data/sites.js</button>
+            <button onclick="grantLocalFilePermission()" id="local-grant-btn" style="display:none; padding:8px 14px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">🔓 授权写入</button>
+            <button onclick="flushLocalFile()" id="local-flush-btn" style="display:none; padding:8px 14px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">✍️ 立即写入本机</button>
+            <button onclick="unbindLocalFile()" id="local-unbind-btn" style="display:none; padding:8px 14px; background:none; color:#ff8a80; border:1px solid rgba(255,138,128,0.5); border-radius:5px; cursor:pointer;">解除绑定</button>
+        </div>
+        <div style="text-align:right; margin-top:18px;">
+            <button onclick="closeModal('local-sync-modal')" style="padding: 8px 16px; background:none; border:none; color:#fff; cursor:pointer;">关闭</button>
         </div>
     </div>
 </div>
@@ -805,7 +813,7 @@
 
     // 模态框遮罩点击关闭 + 背景设置输入事件（替代原先的内联属性绑定）
     function bindModalEvents() {
-        ['site-modal', 'bg-modal'].forEach(id => {
+        ['site-modal', 'bg-modal', 'sync-modal', 'local-sync-modal', 'code-modal'].forEach(id => {
             const modal = document.getElementById(id);
             if (modal) {
                 modal.addEventListener('click', e => {
@@ -2163,7 +2171,6 @@
             if (checkEl) checkEl.disabled = true;
             return;
         }
-
         if (checkEl) checkEl.disabled = false;
 
         if (localFileHandle) {
@@ -2179,7 +2186,6 @@
             : '当前状态：未绑定本机文件，站点改动只写入云端仓库与本机浏览器缓存。';
         stateEl.style.color = '#fbbc05';
     }
-
     // 防止固定顶栏（含两个同步浮标）遮住备忘录提示行：
     // 按顶栏实际高度与换行行数动态撑开上边距（窄屏下顶栏变相对定位，无需处理）
     function avoidTopBarOverlap() {
@@ -2590,8 +2596,8 @@
         });
     }
 
-    // 打开云同步设置
-    function openSyncModal() {
+    // 打开云同步设置（仅云端仓库相关配置）
+    function openCloudSyncModal() {
         const cfg = getSyncConfig();
         const repoEl = document.getElementById('sync-repo');
         const branchEl = document.getElementById('sync-branch');
@@ -2603,16 +2609,28 @@
 
         const stateEl = document.getElementById('sync-state-text');
         if (stateEl) {
-            stateEl.textContent = isSyncEnabled()
-                ? '当前状态：已启用云同步，站点改动会自动提交到仓库。'
-                : '当前状态：未启用。站点改动只保存在本机浏览器，换设备或清缓存会丢失。';
-            stateEl.style.color = isSyncEnabled() ? '#34a853' : '#fbbc05';
+            const saved = readJSON(SYNC_KEY, null) || {};
+            const userRepo = String(saved.repo || '').trim();
+
+            if (cfg.token) {
+                stateEl.textContent = '当前状态：已启用，站点改动会自动提交到 ' + (userRepo || cfg.repo) + '。';
+                stateEl.style.color = '#34a853';
+            } else if (userRepo) {
+                stateEl.textContent = '当前状态：已填仓库 ' + userRepo + '，但缺少访问令牌，云同步未生效。';
+                stateEl.style.color = '#fbbc05';
+            } else {
+                stateEl.textContent = '当前状态：未启用。站点改动只保存在本机浏览器，换设备或清缓存会丢失。';
+                stateEl.style.color = '#fbbc05';
+            }
         }
 
-        // 本机文件同步的状态文案 / 按钮显隐
-        updateLocalFileUI();
-
         openModal('sync-modal');
+    }
+
+    // 打开本机文件同步设置（仅本机文件相关配置）
+    function openLocalSyncModal() {
+        updateLocalFileUI();
+        openModal('local-sync-modal');
     }
     function saveSyncConfig() {
         const repo = (document.getElementById('sync-repo').value || '').trim();
@@ -2633,11 +2651,11 @@
         const localCfg = getLocalFileConfig();
         const localNote = (localCfg.enabled && localFileHandle)
             ? '\n本机 data/sites.js 也会在每次改动时一起更新。'
-            : '\n如需本机 data/sites.js 也自动更新，请在下方「本机文件同步」中绑定文件。';
+            : '\n如需本机 data/sites.js 也自动更新，请点顶部的「本机同步」进行绑定。';
 
         alert(repo
             ? '✅ 云同步已开启\n\n之后添加/修改站点会自动提交到 data/sites.js。' + localNote
-            : '已关闭云同步，站点改动只保存在本机浏览器。\n\n注意：这不会解除本机文件同步（如需一并关闭，请取消下方勾选）。');
+            : '已关闭云同步，站点改动只保存在本机浏览器。\n\n注意：这不会影响「本机同步」的设置。');
 
         closeModal('sync-modal');
 
