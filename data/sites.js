@@ -13,6 +13,13 @@ window.NAV_SITES = {
     "categories": null,
     "sites": [
         {
+            "id": 1001,
+            "name": "Gemini",
+            "url": "https://Gemini.google.com",
+            "icon": "",
+            "remark": "Gemini（网页版）"
+        },
+        {
             "id": 1002,
             "name": "MSCopilot",
             "url": "https://copilot.microsoft.com",
