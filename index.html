@@ -10,7 +10,6 @@
             --accent: #8ab4f8; 
             --bg-glass: rgba(255,255,255,0.12);
             --icon-shadow: 0 6px 14px rgba(0,0,0,0.45);
-            --icon-shadow-hover: 0 6px 14px rgba(0,0,0,0.45);
             --text-color: #fff;
         }
         body {
@@ -18,7 +17,7 @@
             background: #202124 url('image0.webp') no-repeat center center fixed;
             background-size: cover;
             color: #fff; display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; transition: 0.3s; overflow-y: auto;
+            min-height: 100vh; transition: 0.3s; overflow-y: auto; overflow-x: hidden;
         }
         .top-bar { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
         button, .btn-label {
@@ -41,15 +40,14 @@
             display: flex; background: white; border-radius: 30px; padding: 5px 15px;
             align-items: center; box-shadow: 0 4px 25px rgba(0,0,0,0.5);
         }
-        select { border: none; background: none; font-weight: bold; padding: 10px; color: #444; outline: none; cursor: pointer; }
-        #search-input { flex: 1; border: none; outline: none; padding: 12px; font-size: 16px; color: #000; }
+        select { border: none; background: none; font-weight: bold; padding: 10px; color: #444; outline: none; cursor: pointer; max-width: 100%; }
+        #search-input { flex: 1 1 auto; min-width: 0; border: none; outline: none; padding: 12px; font-size: 16px; color: #000; }
         .container { width: 95%; max-width: 1100px; margin-top: 40px; padding-bottom: 50px; }
         .grid { 
             display: grid; 
             grid-template-columns: repeat(8, 1fr); 
             gap: 12px; 
             margin-bottom: 40px; 
-            perspective: none;
         }
         @media (max-width: 950px) {
             #memo-container {
@@ -92,7 +90,9 @@
                 padding: 10px 15px !important; 
                 }
             #search-input {
-                width: 10px;
+                flex: 1 1 auto;
+                width: auto;
+                min-width: 0;
                 font-size: 16px !important; 
                 padding: 10px !important; 
                 font-weight: 500 !important;
@@ -174,7 +174,6 @@
             width: 100%;
             height: 120px; 
             justify-content: center;
-            transform-style: flat;
             transition: none;
         }
         .icon-circle { 
@@ -205,9 +204,24 @@
         .btn-edit { background: #fbbc05; color: #000; }
         .btn-pin { background: #34a853; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
-        .modal-content { background: #2d2e31; padding: 25px; border-radius: 15px; width: 340px; border: 1px solid #444; }
+        .modal-content { background: #2d2e31; padding: 25px; border-radius: 15px; width: 340px; max-width: calc(100vw - 32px); max-height: 90vh; overflow-y: auto; border: 1px solid #444; box-sizing: border-box; }
         .modal-content input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #444; background: #1a1a1a; color: white; box-sizing: border-box; }
         .hidden { display: none; }
+        /* 同步状态指示 */
+        #sync-status { font-size: 12px; opacity: 0; transition: opacity 0.3s; margin-left: 10px; white-space: nowrap; }
+        #sync-status.on { opacity: 1; }
+        .sync-ok { color: #34a853; }
+        .sync-warn { color: #fbbc05; }
+        .sync-err { color: #ff6b6b; }
+        .modal-content textarea {
+            width: 100%; box-sizing: border-box; margin: 10px 0; padding: 12px;
+            background: #1a1a1a; color: #d4d4d4; border: 1px solid #444; border-radius: 8px;
+            font-family: "Consolas", monospace; font-size: 12px; line-height: 1.5;
+            resize: vertical; white-space: pre; overflow-wrap: normal;
+        }
+        .help-text { font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.6; margin: 0 0 4px; }
+        .help-text a { color: var(--accent); }
+        .help-text code { background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; font-family: "Consolas", monospace; }
         .signature-fixed {
             position: fixed;
             top: 65px;
@@ -278,6 +292,16 @@
             cursor: pointer !important;
             user-select: none;
             }
+        /* 最近搜索列表：不受 .card 高度/网格约束 */
+        #history-list .card {
+            height: auto;
+            width: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            }
         .history-icon-circle {
             width: 42px;
             height: 42px;
@@ -320,13 +344,11 @@
         body.dark {
             --bg-glass: rgba(255,255,255,0.12);
             --icon-shadow: 0 6px 14px rgba(0,0,0,0.45);
-            --icon-shadow-hover: 0 6px 14px rgba(0,0,0,0.45);
             --text-color: #fff;
         }
         body.light {
             --bg-glass: rgba(255,255,255,0.65);
             --icon-shadow: 0 6px 14px rgba(0,0,0,0.18);
-            --icon-shadow-hover: 0 6px 14px rgba(0,0,0,0.18);
             --text-color: #111;
         }
         .grid > .card {
@@ -336,6 +358,14 @@
         .edit-mode .icon-circle {
             animation: none !important;
             filter: none !important;
+        }
+        /* 编辑模式下卡片缩小，让上方/下方的删除按钮完整可点 */
+        .edit-mode .card {
+            transform: scale(0.88);
+            z-index: 1;
+        }
+        .edit-mode .card:hover {
+            z-index: 5;
         }
         /* 卡片内容区域样式 */
         .card-content {
@@ -366,6 +396,7 @@
     </style>
 </head>
 <body>
+<script src="data/sites.js" onerror="window.__DATA_LOAD_FAILED__ = true;"></script>
 <div class="welcome-box">
         <!-- 返回首页按钮 -->
     <a href="https://www.firegle.com" style="display: inline-block; font-size: 16px; font-weight: bold; color: inherit; text-decoration: none; color: #ff6700;">点击 进入夏晴烈首页</a>
@@ -383,9 +414,10 @@
     <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-size: 14px; color: #8ab4f8; font-weight: bold; opacity: 0.8; white-space: nowrap;">📝 备忘录</span>
         <span id="save-status" style="font-size: 12px; opacity: 0; transition: 0.3s; color: #34a853; margin-left: 10px; white-space: nowrap;">已存入</span>
+        <span id="sync-status"></span>
     </div>
     <textarea id="memo-input" placeholder="点击这里开始记录...  内容会自动保存.. 或 点击发送到邮箱..&#10;注意以下几点会导致内容消失：&#10;清理浏览器缓存; 多标签页会导致内容被覆盖&#10;系统磁盘清理; 浏览器升级/重装"
-        style="width: 100%; min-height: 90px; max-height: 200px; background: rgba(255,255,255,0.1) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px; color: #fff; padding: 15px; outline: none; resize: none; font-size: 14px; line-height: 1.6; overflow-y: auto;"></textarea>
+        style="width: 100%; min-height: 90px; max-height: 200px; background: rgba(255,255,255,0.1) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 12px; color: #fff; padding: 15px; outline: none; resize: none; font-size: 14px; line-height: 1.6; overflow-y: auto; box-sizing: border-box; display: block;"></textarea>
     <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 0px; padding-right: 0px; font-size: 11px; color: rgba(255,255,255,0.3);">
         <span id="resend-btn" style="cursor: pointer; display: flex; align-items: center; gap: 3px; transition: 0.2s;">✉️ 发送到邮箱</span>
         <span id="copy-btn" style="cursor: pointer; display: flex; align-items: center; gap: 3px; transition: 0.2s;">📋 复制</span>
@@ -396,6 +428,7 @@
 <div class="top-bar">
     <button onclick="openSiteModal()">+ 添加站点</button>
     <button onclick="openModal('bg-modal')">🖼️ 背景</button>
+    <button onclick="openSyncModal()">🔄 云同步</button>
     <button onclick="exportData()">💾 备份</button>
     <button onclick="document.getElementById('import-file').click()">📂 恢复</button>
     <input type="file" id="import-file" class="hidden" onchange="importData(event)">
@@ -419,23 +452,66 @@
     <div class="modal-content">
         <h3>背景设置</h3>
         <label class="btn-label" style="display:block; text-align:center; margin-bottom:15px;">📁 本地上传<input type="file" id="bg-file" class="hidden" onchange="uploadLocalBg()"></label>
-        <input type="text" id="bg-url-input" placeholder="网络图片URL (回车)" onkeypress="if(event.keyCode==13) setNetBg()">
-        <input type="color" id="bg-color-pick" style="width:100%; height:40px;" onchange="setSolidBg()">
+        <input type="text" id="bg-url-input" placeholder="网络图片URL (回车)">
+        <input type="color" id="bg-color-pick" style="width:100%; height:40px;">
         <button onclick="resetBg()" style="width:100%; margin-top:10px; background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:5px;">♻️ 恢复默认背景</button>
         <div style="text-align:right; margin-top:15px;">
             <button onclick="closeModal('bg-modal')" style="background:none; border:none; color:#fff;">关闭</button>
         </div>
     </div>
 </div>
+<div id="sync-modal" class="modal">
+    <div class="modal-content">
+        <h3>云同步设置</h3>
+        <p class="help-text">
+            开启后，网页上「添加 / 编辑 / 删除 / 拖拽排序」站点会自动提交到 GitHub 仓库的
+            <code>data/sites.js</code>，实现跨浏览器、跨设备的永久保存。
+        </p>
+        <p class="help-text" id="sync-state-text"></p>
+        <label style="display:block; margin-top:14px; font-size:13px; color:rgba(255,255,255,0.8);">仓库（owner/repo）</label>
+        <input type="text" id="sync-repo" placeholder="Codivs-Ctrl/WebNavHub">
+        <label style="display:block; font-size:13px; color:rgba(255,255,255,0.8);">分支</label>
+        <input type="text" id="sync-branch" placeholder="main">
+        <label style="display:block; font-size:13px; color:rgba(255,255,255,0.8);">GitHub 访问令牌</label>
+        <input type="password" id="sync-token" placeholder="github_pat_... 或 ghp_...">
+        <p class="help-text" style="margin-top:6px;">
+            令牌说明：只勾选本仓库的 <code>Contents → Read and write</code> 权限即可，不要给其它权限。
+            令牌仅保存在本机浏览器，不会写入代码或提交到仓库。
+            创建入口：<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Fine-grained tokens</a>
+        </p>
+        <div style="text-align:right; margin-top:18px;">
+            <button onclick="testSyncConnection()" id="sync-test-btn" style="padding: 8px 16px; margin-right:8px; background: rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:5px; cursor:pointer;">测试连接</button>
+            <button onclick="saveSyncConfig()" style="padding: 8px 16px; margin-right:8px; background: var(--accent); color:#000; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">保存</button>
+            <button onclick="closeModal('sync-modal')" style="padding: 8px 16px; background:none; border:none; color:#fff; cursor:pointer;">关闭</button>
+        </div>
+        <div style="margin-top:14px; padding-top:14px; border-top:1px solid #444; text-align:center;">
+            <button onclick="exportSitesCode()" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:12px; text-decoration:underline;">不想用令牌？改为手动复制代码保存</button>
+        </div>
+    </div>
+</div>
+<div id="code-modal" class="modal">
+    <div class="modal-content" style="width: 640px;">
+        <h3>手动保存站点代码</h3>
+        <p class="help-text">
+            复制下面全部内容，覆盖仓库中的 <code>data/sites.js</code> 后提交即可永久保存。
+            （若已开启「云同步」，则无需此步骤）
+        </p>
+        <textarea id="code-output" rows="14" readonly spellcheck="false"></textarea>
+        <div style="text-align:right; margin-top:14px;">
+            <button onclick="copySitesCode()" id="copy-code-btn" style="padding: 8px 20px; margin-right:8px; background: var(--accent); color:#000; border:none; border-radius:5px; font-weight:bold; cursor:pointer;">📋 复制全部</button>
+            <button onclick="closeModal('code-modal')" style="padding: 8px 16px; background:none; border:none; color:#fff; cursor:pointer;">关闭</button>
+        </div>
+    </div>
+</div>
 <div class="search-area">
     <div id="logo">Google</div>
     <div class="input-group">
-        <select id="engine" onchange="updateUI()" style="font-size: 16px;">
-            <option value="google">🥳 <span style="font-size: 14px;">Google</span></option>
-            <option value="bing">🐸 <span style="font-size: 14px;">Bing</span></option>
-            <option value="baidu">🐾 <span style="font-size: 14px;">Baidu</span></option>
+        <select id="engine" style="font-size: 16px;">
+            <option value="google">🥳 Google</option>
+            <option value="bing">🐸 Bing</option>
+            <option value="baidu">🐾 Baidu</option>
         </select>
-        <input type="text" id="search-input" placeholder="回车搜索 ( Alt + S 键切换搜索引擎 )" autofocus onkeypress="if(event.keyCode==13) doSearch()">
+        <input type="text" id="search-input" placeholder="回车搜索 ( Alt + S 键切换搜索引擎 )" autofocus>
     </div>
 </div>
 <div class="container">
@@ -452,6 +528,37 @@
 </div>
 
 <script>
+    // ==================== 站点配置（需要替换的内容都集中在这里） ====================
+    // 提示：前端代码无法真正保密，请务必到对应平台配置域名白名单 / 用量限制。
+    //       任意一项留空视为「未启用」，相关功能会自动降级，不影响其它功能。
+    const CONFIG = {
+        // ipinfo.io 的 Access Token，用于显示 IP 归属地；留空则走免 token 接口
+        // 申请地址：https://ipinfo.io/signup
+        ipinfoToken: 'e529fa187290a6',
+
+        // EmailJS，用于「📨 发送到邮箱」功能；控制台：https://dashboard.emailjs.com/
+        emailjs: {
+            publicKey: '3P1oxXvgHXRlgdSHu',      // Account → API Keys
+            serviceId: 'service_erqf5v7',          // Email Services → Service ID
+            templateId: 'template_9hmy1gr',        // Email Templates → Template ID
+            targetEmail: '7533153@qq.com'          // 接收备忘录的邮箱
+        },
+
+        // GitHub 云同步默认仓库（令牌不写在这里，由页面「🔄 云同步」中单独填写并保存在本机）
+        sync: {
+            repo: 'Codivs-Ctrl/WebNavHub',
+            branch: 'main',
+            path: 'data/sites.js'
+        }
+    };
+
+    // EmailJS 配置是否完整
+    function isEmailConfigured() {
+        const e = CONFIG.emailjs;
+        if (!e) return false;
+        return !!(e.publicKey && e.serviceId && e.templateId && e.targetEmail);
+    }
+
     // 全局常量定义
     const engines = {
         google: { 
@@ -476,46 +583,151 @@
     const engineKeys = ['google', 'bing', 'baidu'];
     const STORAGE_KEY = 'cfg_vfinal_memo';
     const USAGE_KEY = 'nav_usage_map';
-    
-    // ========== 工具函数：截断文字为2行 ==========
-    function truncateText(text, maxLines = 1, maxLengthPerLine = 16) {
-        const maxTotalLength = maxLines * maxLengthPerLine;
-        if (text.length <= maxTotalLength) return text;
-        
-        // 截断后添加省略号
-        return text.slice(0, maxTotalLength) + '...';
+    const SITES_KEY = 'cfg_vfinal_sites';
+    const HIST_KEY = 'cfg_vfinal_hist';
+    const BG_KEY = 'cfg_vfinal_bg';
+    const BG_TYPE_KEY = 'cfg_vfinal_bg_type';
+    const SYNC_KEY = 'cfg_github_sync';
+    const FILE_TS_KEY = 'cfg_data_file_ts';
+
+    // 数据文件地址（data/sites.js 与 index.html 同级目录下）
+    const DATA_FILE = 'data/sites.js';
+
+    // 站点 id 生成：使用较大的随机数，避开内置站点占用的 1000-1100 区间
+    function newId() {
+        return Math.floor(Math.random() * 9e12) + 1e12;
     }
-    
+
+    // ========== 基础工具函数 ==========
+    // 安全解析 localStorage，数据损坏时回退默认值，避免整页脚本中断
+    function readJSON(key, fallback) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return fallback;
+            const parsed = JSON.parse(raw);
+            return parsed === null || parsed === undefined ? fallback : parsed;
+        } catch (e) {
+            console.warn(`[NavHub] 本地数据 ${key} 解析失败，已回退默认值`, e);
+            return fallback;
+        }
+    }
+
+    // HTML 实体转义，防止站点名/备注/图标 URL 注入标记或脚本
+    function escapeHtml(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 将普通网址规范化为 http(s)，过滤 javascript: 等危险协议
+    function normalizeUrl(value) {
+        const url = String(value || '').trim();
+        if (!url) return '';
+        if (/^https?:\/\//i.test(url)) return url;
+        if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''; // 其它协议（javascript:、data: 等）一律拒绝
+        return 'https://' + url;
+    }
+
+    // 背景图取值：仅允许 http(s)、data:image、相对路径；
+    // 含空白/引号/括号/分号等可破坏 CSS 的字符时直接判定为非法
+    function sanitizeBgValue(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/[\s"'(){};\\<>`]/.test(raw)) return '';
+
+        const isSafe = /^https?:\/\/\S+$/i.test(raw) ||
+                       /^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(raw) ||
+                       /^\.{0,2}\/[^\s]+$/.test(raw) ||
+                       /^[\w-]+\.(webp|png|jpe?g|gif|avif|svg|bmp)$/i.test(raw);
+        if (!isSafe) return '';
+        return raw;
+    }
+
+    // 站点图标回退地址（仅使用域名，避免把带路径的网址拼进 favicon 服务）
+    function faviconOf(url) {
+        const domain = String(url || '').replace(/^https?:\/\//i, '').split(/[/?#]/)[0];
+        return 'https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain);
+    }
+
+    // 用户站点数据修复：补齐缺失 id、避开内置站点 id 区间、规范化网址与图标
+    // 用于修复历史版本遗留的脏数据（缺 id、伪固定 id、javascript: 协议等）
+    function repairUserSites(sites) {
+        const seenIds = new Set();
+        let changed = false;
+
+        const repaired = sites.filter(s => {
+            if (!s || typeof s !== 'object') {
+                changed = true;
+                return false;
+            }
+            return true;
+        }).map(s => {
+            const item = { ...s };
+
+            const idText = (item.id === undefined || item.id === null || item.id === '') ? '' : String(item.id);
+            const numericId = Number(idText);
+            const isReservedRange = idText !== '' && Number.isFinite(numericId) && numericId >= 1000 && numericId <= 1100;
+
+            if (!idText || isReservedRange || seenIds.has(idText)) {
+                item.id = newId();
+                changed = true;
+            }
+            seenIds.add(String(item.id));
+
+            const safeUrl = normalizeUrl(item.url);
+            if (safeUrl !== item.url) {
+                item.url = safeUrl;
+                changed = true;
+            }
+
+            if (item.icon !== undefined) {
+                const safeIcon = sanitizeIconUrl(item.icon);
+                if (safeIcon !== item.icon) {
+                    item.icon = safeIcon;
+                    changed = true;
+                }
+            }
+
+            return item;
+        });
+
+        return { sites: repaired, changed };
+    }
+
+    // 自定义图标地址清洗：仅允许 http(s) / data:image / 站内相对路径
+    function sanitizeIconUrl(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^(https?:\/\/|data:image\/)/i.test(raw)) return raw.replace(/[\r\n]/g, '');
+        if (/^[\w-]+\.(webp|png|jpe?g|gif|avif|svg|bmp)$/i.test(raw)) return raw;
+        return '';
+    }
+
+    // ========== 工具函数：截断文字 ==========
+    // 与 .site-name-text（height:40px、约 2 行）保持一致：最多 2 行 × 每行 8 字
+    function truncateText(text, maxLines = 2, maxLengthPerLine = 8) {
+        const str = String(text === null || text === undefined ? '' : text).trim();
+        const maxTotalLength = maxLines * maxLengthPerLine;
+        if (str.length <= maxTotalLength) return str;
+        return str.slice(0, maxTotalLength) + '…';
+    }
+
     // ========== 使用频率统计核心逻辑 ==========
-    let usageMap = JSON.parse(localStorage.getItem(USAGE_KEY) || '{}');
+    let usageMap = readJSON(USAGE_KEY, {});
 
     // 保存使用统计到本地存储
     function saveUsage() {
         localStorage.setItem(USAGE_KEY, JSON.stringify(usageMap));
     }
 
-    // 移除呼吸高亮效果函数（不再需要）
-    function applyUsageHighlight() {
-        return;
-    }
-
-    // 绑定点击事件统计使用次数（只绑定图标）
-    function bindUsageClickEvent() {
-        document.querySelectorAll('#site-list .icon-circle').forEach(icon => {
-            const card = icon.closest('.card');
-            if (!card) return;
-            
-            const id = card.getAttribute('data-id');
-            const sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
-            const site = sites.find(s => s.id == id);
-            
-            if (site && site.url) {
-                icon.addEventListener('click', () => {
-                    usageMap[site.url] = (usageMap[site.url] || 0) + 1;
-                    saveUsage();
-                });
-            }
-        });
+    // 记录一次站点点击（供事件委托调用）
+    function recordUsage(url) {
+        if (!url) return;
+        usageMap[url] = (usageMap[url] || 0) + 1;
+        saveUsage();
     }
 
     // ========== 核心功能函数 ==========
@@ -524,19 +736,11 @@
         updateUI(); 
     }
 
-    // 打开模态框（修复：重写事件绑定逻辑）
+    // 打开模态框
     function openModal(id) {
         const modal = document.getElementById(id);
         if (!modal) return;
-        
         modal.style.display = 'flex';
-        modal.onclick = null;
-        
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                closeModal(id);
-            }
-        }, { once: true });
     }
 
     // 关闭模态框
@@ -563,56 +767,115 @@
         }
     }
 
-    function uploadLocalBg() {
-        const file = document.getElementById('bg-file').files[0];
-        const reader = new FileReader();
-        reader.onloadend = () => applyBg(reader.result, 'img');
-        if(file) reader.readAsDataURL(file);
-    }
-
-    function setNetBg() { 
-        applyBg(document.getElementById('bg-url-input').value, 'img'); 
-    }
-
-    function setSolidBg() { 
-        applyBg(document.getElementById('bg-color-pick').value, 'color'); 
-    }
-
-    function doSearch() {
-        const type = document.getElementById('engine').value;
-        const inputEl = document.getElementById('search-input');
-        const kw = inputEl.value.trim();
-        if(!kw) return;
-        
-        let hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
-        hist = hist.filter(item => item.name !== kw);
-        hist.unshift({ 
-            id: Date.now(), 
-            name: kw, 
-            url: engines[type].url + encodeURIComponent(kw) 
+    // 模态框遮罩点击关闭 + 背景设置输入事件（替代原先的内联属性绑定）
+    function bindModalEvents() {
+        ['site-modal', 'bg-modal'].forEach(id => {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.addEventListener('click', e => {
+                    if (e.target === modal) closeModal(id);
+                });
+            }
         });
-        localStorage.setItem('cfg_vfinal_hist', JSON.stringify(hist.slice(0, 100)));
-        renderHistory();
-        
-        const targetUrl = engines[type].url + encodeURIComponent(kw);
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            window.location.href = targetUrl;
-        } else {
-            window.open(targetUrl, '_blank');
+
+        const bgUrlInput = document.getElementById('bg-url-input');
+        if (bgUrlInput) {
+            bgUrlInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setNetBg();
+                }
+            });
+        }
+
+        const bgColorPick = document.getElementById('bg-color-pick');
+        if (bgColorPick) {
+            bgColorPick.addEventListener('change', setSolidBg);
+            bgColorPick.addEventListener('input', setSolidBg);
         }
     }
 
+    function uploadLocalBg() {
+        const fileInput = document.getElementById('bg-file');
+        const file = fileInput && fileInput.files[0];
+        if (!file) return;
+
+        if (!/^image\//i.test(file.type)) {
+            alert('请选择图片文件');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') applyBg(reader.result, 'img');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function setNetBg() { 
+        const inputEl = document.getElementById('bg-url-input');
+        if (!inputEl) return;
+
+        const url = sanitizeBgValue(inputEl.value);
+        if (!url) {
+            alert('请输入有效的图片地址（需以 http:// 或 https:// 开头）');
+            return;
+        }
+
+        applyBg(url, 'img');
+        closeModal('bg-modal');
+    }
+
+    function setSolidBg() { 
+        const picker = document.getElementById('bg-color-pick');
+        if (!picker) return;
+
+        const color = picker.value;
+        if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+
+        applyBg(color, 'color');
+        closeModal('bg-modal');
+    }
+
+    function doSearch() {
+        const engineSelect = document.getElementById('engine');
+        const inputEl = document.getElementById('search-input');
+        if (!engineSelect || !inputEl) return;
+
+        const engineKey = engines[engineSelect.value] ? engineSelect.value : engineKeys[0];
+        const kw = inputEl.value.trim();
+        if (!kw) return;
+
+        saveSearch(kw);
+        smartOpen(engines[engineKey].url + encodeURIComponent(kw));
+    }
+
+    // 记录搜索历史（去重 + 最多保留 100 条）
     function saveSearch(kw) {
-        let hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
-        hist = hist.filter(item => item.name !== kw);
-        hist.unshift({ id: Date.now(), name: kw });
-        localStorage.setItem('cfg_vfinal_hist', JSON.stringify(hist.slice(0, 100)));
+        let hist = readJSON(HIST_KEY, []);
+        if (!Array.isArray(hist)) hist = [];
+
+        // 站点名 → 当前搜索引擎地址；否则沿用该关键词原有地址
+        const existing = hist.find(item => item && item.name === kw);
+        const engineSelect = document.getElementById('engine');
+        const engineKey = engineSelect && engines[engineSelect.value] ? engineSelect.value : engineKeys[0];
+        const searchUrl = engines[engineKey].url + encodeURIComponent(kw);
+
+        hist = hist.filter(item => !item || item.name !== kw);
+        hist.unshift({
+            id: Date.now(),
+            name: kw,
+            url: normalizeUrl(existing && existing.url ? existing.url : searchUrl)
+        });
+
+        localStorage.setItem(HIST_KEY, JSON.stringify(hist.slice(0, 100)));
+        renderHistory();
     }
 
     // 打开站点编辑模态框
     function openSiteModal(id = null) {
-        const sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
+        const sites = Array.isArray(siteStore) ? siteStore : [];
+
         const editIdInput = document.getElementById('edit-id');
         const siteName = document.getElementById('site-name');
         const siteUrl = document.getElementById('site-url');
@@ -620,7 +883,7 @@
         const siteRemark = document.getElementById('site-remark');
         const modalTitle = document.getElementById('modal-title');
 
-        if (!editIdInput || !siteName || !siteUrl || !modalTitle) {
+        if (!editIdInput || !siteName || !siteUrl || !siteIcon || !siteRemark || !modalTitle) {
             console.error('模态框表单元素缺失');
             return;
         }
@@ -633,9 +896,9 @@
             siteRemark.value = "";
             modalTitle.textContent = "添加快捷方式";
         } else {
-            const site = sites.find(s => s.id == id);
+            const site = sites.find(s => s && s.id == id);
             if (site) {
-                editIdInput.value = id;
+                editIdInput.value = site.id;
                 siteName.value = site.name || "";
                 siteUrl.value = site.url || "";
                 siteIcon.value = site.icon || "";
@@ -648,6 +911,7 @@
             }
         }
         openModal('site-modal');
+        siteName.focus();
     }
 
     // 保存站点
@@ -658,48 +922,45 @@
         const siteIcon = document.getElementById('site-icon');
         const siteRemark = document.getElementById('site-remark');
 
-        if (!editIdInput || !siteName || !siteUrl) {
+        if (!editIdInput || !siteName || !siteUrl || !siteIcon || !siteRemark) {
             alert('表单元素加载异常，请刷新页面');
             return;
         }
         const name = siteName.value.trim();
-        let url = siteUrl.value.trim();
         if (!name) {
             alert('请输入站点名称');
             siteName.focus();
             return;
         }
-        if (!url) {
+        if (!siteUrl.value.trim()) {
             alert('请输入站点网址');
             siteUrl.focus();
             return;
         }
 
-        if (!/^https?:\/\//i.test(url)) {
-            url = 'https://' + url;
-        }
-
-        let sites = [];
-        try {
-            sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites') || '[]');
-        } catch (e) {
-            console.error('本地站点数据损坏，已重置', e);
-            localStorage.setItem('cfg_vfinal_sites', '[]');
+        const url = normalizeUrl(siteUrl.value);
+        if (!url) {
+            alert('网址格式不正确，请填写 http:// 或 https:// 开头的地址');
+            siteUrl.focus();
+            return;
         }
 
         const editId = editIdInput.value;
         const siteData = {
-            id: editId ? parseInt(editId) : Date.now(),
+            id: editId ? parseInt(editId, 10) : newId(),
             name: name,
             url: url,
-            icon: siteIcon.value.trim(),
+            icon: sanitizeIconUrl(siteIcon.value),
             remark: siteRemark.value.trim()
         };
+
+        if (!siteStore) siteStore = [];
+        const sites = siteStore;
 
         if (!editId) {
             sites.push(siteData);
         } else {
-            const idx = sites.findIndex(s => s.id == editId);
+            const idx = sites.findIndex(s => s && String(s.id) === String(editId));
             if (idx !== -1) {
                 sites[idx] = siteData;
             } else {
@@ -708,58 +969,102 @@
             }
         }
 
-        localStorage.setItem('cfg_vfinal_sites', JSON.stringify(sites));
+        persistSites();
         render();
         closeModal('site-modal');
     }
 
+    // 删除站点 / 历史记录
     function removeData(key, id) {
-        let data = JSON.parse(localStorage.getItem(key)) || [];
-        const filtered = data.filter(item => item.id != id);
-        localStorage.setItem(key, JSON.stringify(filtered));
-        render();
+        if (key === SITES_KEY) {
+            if (!siteStore) siteStore = [];
+            siteStore = siteStore.filter(s => !s || String(s.id) !== String(id));
+
+            persistSites();
+            render();
+            return;
+        }
+
+        let data = readJSON(key, []);
+        if (!Array.isArray(data)) data = [];
+
+        localStorage.setItem(key, JSON.stringify(data.filter(item => !item || String(item.id) !== String(id))));
+        renderHistory();
     }
 
     function pinHistory(id) {
-        let hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
-        let sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
-        const item = hist.find(h => h.id == id);
-        
-        if(item) { 
-            sites.push({ ...item, id: Date.now() }); 
-            localStorage.setItem('cfg_vfinal_sites', JSON.stringify(sites)); 
-            removeData('cfg_vfinal_hist', id); 
+        let hist = readJSON(HIST_KEY, []);
+        if (!Array.isArray(hist)) hist = [];
+
+        const item = hist.find(h => h && h.id == id);
+        if (!item) return;
+
+        const name = String(item.name || '').trim();
+        if (!name) return;
+
+        if (!siteStore) siteStore = [];
+        if (siteStore.some(s => s && s.name === name)) {
+            alert('快捷导航中已存在同名站点');
+            return;
         }
+
+        // 历史记录里已带搜索引擎地址则沿用，否则按当前搜索引擎生成
+        const engineSelect = document.getElementById('engine');
+        const engineKey = engineSelect && engines[engineSelect.value] ? engineSelect.value : engineKeys[0];
+        const url = normalizeUrl(item.url || (engines[engineKey].url + encodeURIComponent(name)));
+
+        siteStore.push({ id: newId(), name: name, url: url, icon: '', remark: '' });
+        persistSites();
+
+        removeData(HIST_KEY, id);
+        render();
     }
 
     function initSortable() {
         const el = document.getElementById('site-list');
         if (!el) return;
-        
-        const isEditMode = document.body.classList.contains('edit-mode');
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
+
         if (window.sortableInstance) {
             window.sortableInstance.destroy();
+            window.sortableInstance = null;
         }
-        
+
+        // CDN 未加载时不阻断后续初始化
+        if (!window.Sortable) {
+            console.warn('[NavHub] Sortable 未加载，已跳过拖拽排序');
+            return;
+        }
+
+        const isEditMode = document.body.classList.contains('edit-mode');
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
         window.sortableInstance = Sortable.create(el, {
             animation: 0,
-            disabled: isMobile ? !isEditMode : false, 
+            disabled: !isEditMode,
             delay: isMobile ? 200 : 100,
             delayOnTouchOnly: true,
             touchStartThreshold: 20,
+            filter: '.edit-btns',
+            preventOnFilter: false,
             onEnd: function() {
-                let newOrder = []; 
-                const sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
-                
-                document.querySelectorAll('#site-list .card').forEach(card => {
-                    const id = card.getAttribute('data-id');
-                    const site = sites.find(s => s.id == id);
-                    if(site) newOrder.push(site);
+                const byId = new Map((siteStore || []).map(s => [String(s && s.id), s]));
+
+                // 按 DOM 顺序重排站点，并保留未渲染出来的条目
+                const ordered = [];
+                el.querySelectorAll('.card[data-id]').forEach(card => {
+                    const site = byId.get(card.getAttribute('data-id'));
+                    if (site) {
+                        ordered.push(site);
+                        byId.delete(card.getAttribute('data-id'));
+                    }
                 });
-                
-                localStorage.setItem('cfg_vfinal_sites', JSON.stringify(newOrder));
+                byId.forEach(site => ordered.push(site));
+
+                siteStore = ordered;
+                persistSites();
+
+                // 延后重绘，避免在 Sortable 回调中销毁自身实例
+                setTimeout(render, 0);
             }
         });
     }
@@ -787,21 +1092,28 @@
         }
         
         renderHistory(); 
+        render();
     }
 
     function updateUI() { 
-        const engineVal = document.getElementById('engine').value;
-        const e = engines[engineVal]; 
+        const engineSelect = document.getElementById('engine');
         const logoEl = document.getElementById('logo');
-        
-        if(e && logoEl) {
-            if (e.logoIcon) {
-                logoEl.innerHTML = `<img src="${e.logoIcon}" style="height:110px; vertical-align:middle;">`;
-            } else {
-                logoEl.innerText = e.name;
-            }
-            logoEl.style.color = e.color;
+        if (!engineSelect || !logoEl) return;
+
+        const e = engines[engineSelect.value];
+        if (!e) return;
+
+        if (e.logoIcon) {
+            const img = document.createElement('img');
+            img.src = e.logoIcon;
+            img.alt = e.name + ' 图标';
+            img.style.height = '110px';
+            img.style.verticalAlign = 'middle';
+            logoEl.replaceChildren(img);
+        } else {
+            logoEl.textContent = e.name;
         }
+        logoEl.style.color = e.color;
     }
 
     function smartOpen(url, event) {
@@ -813,143 +1125,135 @@
         if (document.body.classList.contains('edit-mode')) {
             return; 
         }
+
+        const target = normalizeUrl(url);
+        if (!target) {
+            alert('该站点地址无效，请重新编辑');
+            return;
+        }
         
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (isMobile) {
-            window.location.href = url;
+            window.location.href = target;
         } else {
-            window.open(url, '_blank');
+            window.open(target, '_blank', 'noopener,noreferrer');
         }
     }
 
     function renderHistory() {
-        const hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
+        let hist = readJSON(HIST_KEY, []);
+        if (!Array.isArray(hist)) hist = [];
+
         const container = document.getElementById('search-history-area');
         const listContainer = document.getElementById('history-list');
         
         if (!container || !listContainer) return;
 
-        container.style.display = 'block';
         const isEditMode = document.body.classList.contains('edit-mode');
+
+        // 无可展示内容且非编辑模式时整块隐藏
+        container.style.display = (hist.length === 0 && !isEditMode) ? 'none' : 'block';
 
         if (hist.length === 0) {
             listContainer.innerHTML = '<span style="color: #888; font-size: 0.85em; padding: 5px;">暂无搜索记录</span>';
-        } else {
-            listContainer.style.display = 'flex';
-            listContainer.style.flexWrap = 'wrap';
-            listContainer.style.gap = '12px';
-
-            listContainer.innerHTML = hist.map((item, index) => {
-                // 截断历史记录文字
-                const truncatedName = truncateText(item.name);
-                return `
-                <div class="history-item" style="position: relative; display: flex; align-items: center; background: rgba(255,255,255,0.08); padding: 8px 16px 8px 10px; border-radius: 20px; max-width: 100%;">
-                    <div style="position: relative; width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                        <div class="history-click-zone" onclick="fillAndSearch('${item.name.replace(/'/g, "\\'")}')" style="cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                            <div class="history-icon-circle" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.15); font-size: 16px;">
-                                🕒
-                            </div>
-                        </div>
-                        ${isEditMode ? `
-                        <div onclick="deleteSingleHistory(${index}, event)" 
-                             style="position: absolute; top: -6px; right: -6px; background: #ff4d4d; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; z-index: 102; border: 1.5px solid #222;">
-                            ✕
-                        </div>
-                        <div onclick="pinToSites('${item.name.replace(/'/g, "\\'")}', event)" 
-                             style="position: absolute; top: -6px; left: -6px; background: #2ecc71; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; z-index: 101; border: 1.5px solid #222;">
-                            📌
-                        </div>` : ''}
-                    </div>
-                    <div class="history-text-selectable" 
-                         style="margin-left: 12px; font-size: 14px; color: rgba(255,255,255,0.9); cursor: text; white-space: normal; word-break: break-all; line-height: 1.3; user-select: text; -webkit-user-select: text;">
-                        ${truncatedName}
-                    </div>
-                </div>`;
-            }).join('');
-        }
-    }
-
-    function pinToSites(name, event) {
-        if (event) event.stopPropagation();
-        
-        let sites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
-        if (sites.some(s => s.name === name)) {
-            alert("已存在");
             return;
         }
-        
-        const engineSelect = document.getElementById('engine');
-        const type = (engineSelect && engineSelect.value) ? engineSelect.value : Object.keys(engines)[0];
-        let targetUrl = "https://www.google.com/search?q=" + encodeURIComponent(name);
-        
-        if (engines[type]) {
-            targetUrl = engines[type].url + encodeURIComponent(name);
-        }
-        
-        sites.push({ name: name, url: targetUrl, icon: "" });
-        localStorage.setItem('cfg_vfinal_sites', JSON.stringify(sites));
-        render();
-        alert("已固定到快捷导航");
+
+        listContainer.innerHTML = hist.map(item => {
+            const name = String(item && item.name ? item.name : '');
+            const safeName = escapeHtml(name);
+            const truncatedName = escapeHtml(truncateText(name));
+            const fullTitle = escapeHtml(name.length > 16 ? name : '');
+            const id = escapeHtml(item && item.id !== undefined ? item.id : '');
+            const itemTitle = fullTitle ? ` title="${fullTitle}"` : '';
+
+            return `
+            <div class="history-item" data-id="${id}" style="position: relative; display: flex; align-items: center; background: rgba(255,255,255,0.08); padding: 8px 16px 8px 10px; border-radius: 20px; max-width: 100%;">
+                <div style="position: relative; width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                    <div class="history-click-zone" data-action="search-history" data-name="${safeName}" style="cursor: pointer; display: flex; align-items: center; justify-content: center;" title="按当前搜索引擎重新搜索">
+                        <div class="history-icon-circle" style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.15); font-size: 16px;">
+                            🕒
+                        </div>
+                    </div>
+                    ${isEditMode ? `
+                    <div data-action="delete-history" style="position: absolute; top: -6px; right: -6px; background: #ff4d4d; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; z-index: 102; border: 1.5px solid #222;" title="删除这条记录">✕</div>
+                    <div data-action="pin-history" style="position: absolute; top: -6px; left: -6px; background: #2ecc71; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; z-index: 101; border: 1.5px solid #222;" title="固定到快捷导航">📌</div>` : ''}
+                </div>
+                <div class="history-text-selectable"${itemTitle}
+                     style="margin-left: 12px; font-size: 14px; color: rgba(255,255,255,0.9); cursor: text; white-space: normal; word-break: break-all; line-height: 1.3; user-select: text; -webkit-user-select: text;">
+                    ${truncatedName}
+                </div>
+            </div>`;
+        }).join('');
     }
 
-    function deleteSingleHistory(index, event) {
+    function deleteSingleHistory(id, event) {
         if (event) event.stopPropagation();
-        
-        let hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
-        hist.splice(index, 1);
-        localStorage.setItem('cfg_vfinal_hist', JSON.stringify(hist));
+
+        let hist = readJSON(HIST_KEY, []);
+        if (!Array.isArray(hist)) hist = [];
+
+        hist = hist.filter(item => !item || String(item.id) !== String(id));
+        localStorage.setItem(HIST_KEY, JSON.stringify(hist));
         renderHistory();
     }
 
     function clearHistory() {
         if (!confirm("确定要清空所有记录吗？")) return;
-        localStorage.removeItem('cfg_vfinal_hist');
+        localStorage.removeItem(HIST_KEY);
         renderHistory();
     }
 
     function fillAndSearch(name) {
+        const kw = String(name || '').trim();
+        if (!kw) return;
+
         const input = document.getElementById('search-input');
-        const engineSelect = document.getElementById('engine'); 
-        
-        if (input) {
-            input.value = name;
-            const type = (engineSelect && engineSelect.value) ? engineSelect.value : Object.keys(engines)[0];
-            const targetUrl = engines[type].url + encodeURIComponent(name);
-            
-            smartOpen(targetUrl);
-            saveSearch(name); 
-            renderHistory();
-        }
+        if (input) input.value = kw;
+
+        const engineSelect = document.getElementById('engine');
+        const engineKey = engineSelect && engines[engineSelect.value] ? engineSelect.value : engineKeys[0];
+
+        smartOpen(engines[engineKey].url + encodeURIComponent(kw));
+        saveSearch(kw);
     }
 
     async function refreshPublicIP() {
         const ipDisplay = document.getElementById('pub-ip');
         if (!ipDisplay) return;
     
-        const token = 'e529fa187290a6';
-        
+        // 有 token 走 IPinfo 详细接口，无 token 走免鉴权接口（无归属地信息）
+        const token = String(CONFIG.ipinfoToken || '').trim();
+        const primaryUrl = token
+            ? `https://ipinfo.io/json?token=${encodeURIComponent(token)}`
+            : 'https://ipinfo.io/json';
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+
         try {
-            const resp = await fetch(`https://ipinfo.io/json?token=${token}`);
-            
-            if (!resp.ok) throw new Error("IPinfo 请求失败");
+            const resp = await fetch(primaryUrl, { signal: controller.signal });
+
+            if (!resp.ok) throw new Error(`IPinfo 请求失败（${resp.status}）`);
         
             const data = await resp.json();
             const country = data.country || "未知国家";
             const region = data.region || "";
             const city = data.city || "";
         
-            ipDisplay.innerText = `IP: ${data.ip}\n位置: ${country} ${region} ${city}`.trim();
+            ipDisplay.innerText = `IP: ${data.ip || "未知"}\n位置: ${country} ${region} ${city}`.trim();
         
         } catch (e) {
-            console.error("IPinfo 失败，尝试备用链路:", e);
+            console.warn("IPinfo 失败，尝试备用链路:", e);
             
             try {
-                const resp = await fetch('https://api.ipify.org?format=json');
+                const resp = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
                 const data = await resp.json();
-                ipDisplay.innerText = `IP: ${data.ip}\n位置: 备用链路已激活 (无位置信息)`;
+                ipDisplay.innerText = `IP: ${data.ip || "未知"}\n位置: 备用链路已激活 (无位置信息)`;
             } catch (err) {
                 ipDisplay.innerText = "IP: 获取失败\n位置: 请检查网络连接";
             }
+        } finally {
+            clearTimeout(timer);
         }
     }
 
@@ -1020,10 +1324,18 @@
         const clearBtn = document.getElementById('clear-btn');
         const resendBtn = document.getElementById('resend-btn');
 
-        const EMAILJS_PUBLIC_KEY = '3P1oxXvgHXRlgdSHu'; 
-        const EMAILJS_SERVICE_ID = 'service_erqf5v7';     
-        const EMAILJS_TEMPLATE_ID = 'template_9hmy1gr';   
-        const TARGET_EMAIL = '7533153@qq.com';
+        // EmailJS 参数统一取自顶部 CONFIG
+        const EMAILJS_PUBLIC_KEY = CONFIG.emailjs.publicKey;
+        const EMAILJS_SERVICE_ID = CONFIG.emailjs.serviceId;
+        const EMAILJS_TEMPLATE_ID = CONFIG.emailjs.templateId;
+        const TARGET_EMAIL = CONFIG.emailjs.targetEmail;
+        const emailEnabled = isEmailConfigured();
+
+        // 未配置 EmailJS 时隐藏入口，避免点击后报错
+        if (resendBtn && !emailEnabled) {
+            resendBtn.style.display = 'none';
+            console.warn('[NavHub] 未配置 EmailJS，已隐藏「发送到邮箱」入口');
+        }
 
         function formatDateTime() {
             const now = new Date();
@@ -1037,6 +1349,13 @@
         }
 
         async function sendToEmail() {
+            if (!memoInput || !resendBtn) return;
+
+            if (!emailEnabled) {
+                alert('未配置 EmailJS，请先在页面顶部 CONFIG.emailjs 中填写参数');
+                return;
+            }
+
             const content = memoInput.value.trim();
             if (!content) {
                 alert('暂无内容可发送，请先输入备忘录内容！');
@@ -1075,7 +1394,7 @@
             
             } catch (error) {
                 console.error('发送失败详情：', error);
-                alert(`❌ 发送失败：${error.message.substring(0, 100)}`);
+                alert(`❌ 发送失败：${String(error && error.message || error).substring(0, 100)}`);
             } finally {
                 resendBtn.textContent = '✉️ 发送到邮箱';
                 resendBtn.disabled = false;
@@ -1083,17 +1402,18 @@
             }
         }
 
-        if (resendBtn) {
+        if (resendBtn && emailEnabled) {
             resendBtn.addEventListener('click', sendToEmail);
         }
 
+        // 备忘录读取：兼容历史遗留的纯文本存储
         const rawData = localStorage.getItem(STORAGE_KEY);
         if (rawData && memoInput) {
-            try {
-                const data = JSON.parse(rawData);
-                memoInput.value = (typeof data === 'object' && data.content !== undefined) ? data.content : rawData;
-            } catch (e) { 
-                memoInput.value = rawData; 
+            const parsed = readJSON(STORAGE_KEY, null);
+            if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+                memoInput.value = parsed.content;
+            } else {
+                memoInput.value = rawData;
             }
         }
 
@@ -1120,26 +1440,28 @@
             });
         }
 
-        if (copyBtn) {
-            copyBtn.onclick = () => {
+        if (copyBtn && memoInput) {
+            copyBtn.addEventListener('click', () => {
                 navigator.clipboard.writeText(memoInput.value).then(() => {
                     const oldText = copyBtn.innerText;
                     copyBtn.innerText = "✅ 已复制";
                     setTimeout(() => { 
                         copyBtn.innerText = oldText; 
                     }, 2000);
+                }).catch(() => {
+                    alert('复制失败，请手动选择文本复制');
                 });
-            };
+            });
         }
 
-        if (clearBtn) {
-            clearBtn.onclick = () => {
+        if (clearBtn && memoInput) {
+            clearBtn.addEventListener('click', () => {
                 if (confirm("确定要清空备忘录吗？此操作不可撤销。")) {
                     memoInput.value = "";
                     localStorage.removeItem(STORAGE_KEY);
                     if (window.refreshDeviceInfo) window.refreshDeviceInfo();
                 }
-            };
+            });
         }
     }
 
@@ -1147,11 +1469,12 @@
     function exportData() {
         try {
             const data = { 
-                sites: localStorage.getItem('cfg_vfinal_sites'), 
-                bg: localStorage.getItem('cfg_vfinal_bg'), 
-                bgType: localStorage.getItem('cfg_vfinal_bg_type'),
+                sites: JSON.stringify(siteStore || []), 
+                bg: localStorage.getItem(BG_KEY), 
+                bgType: localStorage.getItem(BG_TYPE_KEY),
                 memo: localStorage.getItem(STORAGE_KEY), 
-                history: localStorage.getItem('cfg_vfinal_hist')
+                history: localStorage.getItem(HIST_KEY),
+                exportedAt: new Date().toISOString()
             };
             const blob = new Blob([JSON.stringify(data)], {type: 'application/json'});
             const a = document.createElement('a'); 
@@ -1166,175 +1489,828 @@
         }
     }
 
-    // 导入数据
+    // 导入数据：先整体校验再写入，避免半套脏数据破坏页面
     function importData(e) {
-        const file = e.target.files[0];
+        const input = e && e.target;
+        const file = input && input.files ? input.files[0] : null;
         if (!file) return;
-        
+
+        const resetInput = () => { if (input) input.value = ''; };
+
         const reader = new FileReader();
         reader.onload = function() {
+            let data;
             try {
-                const data = JSON.parse(reader.result);
-                if(data.sites) localStorage.setItem('cfg_vfinal_sites', data.sites); 
-                if(data.bg) localStorage.setItem('cfg_vfinal_bg', data.bg); 
-                if(data.bgType) localStorage.setItem('cfg_vfinal_bg_type', data.bgType);
-                if(data.history) localStorage.setItem('cfg_vfinal_hist', data.history); 
-                if(data.memo) {
-                    if (data.memo.includes('"content":')) {
-                        localStorage.setItem(STORAGE_KEY, data.memo); 
-                    } else {
-                        const wrapMemo = {
-                            content: data.memo,
-                            lastModified: new Date().toISOString()
-                        };
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(wrapMemo));
-                    }
-                }
-                alert("✅ 所有配置同步成功！");
-                location.reload();
-            } catch(err) { 
-                alert("❌ 导入失败：文件格式不正确"); 
+                data = JSON.parse(reader.result);
+            } catch (err) {
+                alert("❌ 导入失败：文件不是合法的 JSON");
+                resetInput();
+                return;
             }
+
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+                alert("❌ 导入失败：文件结构不符合备份格式");
+                resetInput();
+                return;
+            }
+
+            const parseField = (value, label, expectArray) => {
+                if (value === undefined || value === null || value === '') return null;
+                try {
+                    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+                    if (expectArray && !Array.isArray(parsed)) throw new Error('not array');
+                    return parsed;
+                } catch (err) {
+                    throw new Error(label);
+                }
+            };
+
+            let sites, history, bg, bgType, memo;
+            try {
+                sites = parseField(data.sites, '站点列表', true);
+                history = parseField(data.history, '搜索历史', true);
+                bgType = data.bgType === undefined ? null : String(data.bgType);
+                bg = data.bg === undefined || data.bg === null ? null : String(data.bg);
+                memo = data.memo === undefined || data.memo === null ? null : String(data.memo);
+            } catch (err) {
+                alert(`❌ 导入失败：${err.message}格式不正确`);
+                resetInput();
+                return;
+            }
+
+            // 站点数据清洗：补 id、去掉固定站点 id 冲突项、规范化网址
+            const cleanedSites = [];
+            if (sites) {
+                sites.forEach(s => {
+                    if (!s || typeof s !== 'object') return;
+
+                    const name = String(s.name || '').trim();
+                    const url = normalizeUrl(s.url);
+                    if (!name || !url) return;
+
+                    let id = Number.isFinite(Number(s.id)) ? Number(s.id) : null;
+                    if (id === null || (id >= 1000 && id <= 1100)) id = newId();
+
+                    cleanedSites.push({
+                        id: id,
+                        name: name,
+                        url: url,
+                        icon: sanitizeIconUrl(s.icon),
+                        remark: String(s.remark || '').trim()
+                    });
+                });
+            }
+
+            // 历史清洗：去重、补 url、限制条数
+            const cleanedHistory = [];
+            const seenNames = new Set();
+            if (history) {
+                history.forEach(h => {
+                    if (!h || typeof h !== 'object') return;
+
+                    const name = String(h.name || '').trim();
+                    if (!name || seenNames.has(name)) return;
+                    seenNames.add(name);
+
+                    let id = Number.isFinite(Number(h.id)) ? Number(h.id) : null;
+                    if (id === null) id = Date.now() + cleanedHistory.length;
+
+                    cleanedHistory.push({
+                        id: id,
+                        name: name,
+                        url: normalizeUrl(h.url) || (engines[engineKeys[0]].url + encodeURIComponent(name))
+                    });
+                });
+            }
+
+            // 全部校验通过后才写入
+            if (sites) {
+                siteStore = normalizeSites(cleanedSites);
+                persistSites();
+            }
+            if (history) localStorage.setItem(HIST_KEY, JSON.stringify(cleanedHistory.slice(0, 100)));
+
+            if (bg !== null) {
+                const safeBg = bgType === 'color'
+                    ? (/^#[0-9a-f]{6}$/i.test(bg) ? bg : '')
+                    : sanitizeBgValue(bg);
+
+                if (safeBg) {
+                    localStorage.setItem(BG_KEY, safeBg);
+                    localStorage.setItem(BG_TYPE_KEY, bgType === 'color' ? 'color' : 'img');
+                } else {
+                    localStorage.removeItem(BG_KEY);
+                    localStorage.removeItem(BG_TYPE_KEY);
+                }
+            }
+
+            if (memo !== null) {
+                let memoContent = memo;
+                try {
+                    const parsedMemo = JSON.parse(memo);
+                    if (parsedMemo && typeof parsedMemo === 'object' && typeof parsedMemo.content === 'string') {
+                        memoContent = parsedMemo.content;
+                    }
+                } catch (err) {
+                    // 旧版纯文本备忘录，直接沿用
+                }
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    content: memoContent,
+                    lastModified: new Date().toISOString()
+                }));
+            }
+
+            alert("✅ 所有配置同步成功！");
+            location.reload();
         };
+
+        reader.onerror = function() {
+            alert("❌ 导入失败：文件读取异常");
+            resetInput();
+        };
+
         reader.readAsText(file);
     }
 
-    // 渲染导航站点（核心修复：JS截断文字）
-    function render() {
-        const fixedSites = [
-            { id: 1001, name: "Gemini", url: "https://gemini.google.com", remark: "Google 官方 AI 助手" },
-            { id: 1002, name: "MSCopilot", url: "https://copilot.microsoft.com", remark: "微软 Copilot（网页版）" },
-            { id: 1003, name: "ChatGPT", url: "https://chatgpt.com", remark: "OpenAI 官方 ChatGPT" },
-            { id: 1004, name: "GHCopilot", url: "https://copilot.github.com", remark: "GitHub Copilot 产品主页" },
-            { id: 1005, name: "YouTuBe", url: "https://www.youtube.com", remark: "全球最大视频平台 / 技术 & 娱乐" },
-            { id: 1006, name: "YouKu", url: "https://www.youku.com", remark: "国内视频平台" },
-            { id: 1007, name: "Github", url: "https://www.github.com", remark: "代码托管 / 开源项目平台" },
-            { id: 1008, name: "BiliBili", url: "https://www.bilibili.com", remark: "国内技术 / 二次元视频社区" },
-            { id: 1011, name: "MSUser", url: "https://login.live.com", remark: "微软账号统一登录入口" },
-            { id: 1012, name: "Onenote", url: "https://www.onenote.com", remark: "微软 OneNote 在线版" },
-            { id: 1013, name: "Google.HK", url: "https://www.google.com.hk", remark: "Google 搜索（香港节点）" },
-            { id: 1014, name: "Docker", url: "https://www.docker.com/", remark: "容器技术官方站点" },
-            { id: 1015, name: "IP138", url: "https://www.ip138.com/", remark: "国内 IP / 归属地查询" },
-            { id: 1016, name: "IP.sb", url: "https://ip.sb/", remark: "公网 IP / ASN 查询" },
-            { id: 1017, name: "Gitee", url: "https://gitee.com/", remark: "国内代码托管平台" },
-            { id: 1018, name: "OKX", url: "https://www.okx.com/", remark: "加密货币交易平台" },
-            { id: 1019, name: "Web3_OKX", url: "https://web3.okx.com/", remark: "OKX Web3 钱包与应用" },
-            { id: 1020, name: "微软翻译", url: "https://cn.bing.com/translator", remark: "Microsoft 在线翻译" },
-            { id: 1021, name: "谷歌翻译", url: "https://translate.google.com/", remark: "Google 在线翻译" },
-            { id: 1022, name: "Binance", url: "https://binance.com/", remark: "加密货币交易平台" },
-            { id: 1023, name: "528btc", url: "https://528btc.com/", remark: "区块链 / 数字货币资讯" },
-            { id: 1024, name: "Grok", url: "https://x.com/i/grok", remark: "X 平台内置 AI（Grok）" },
-            { id: 1025, name: "x", url: "https://x.com/", remark: "X（原 Twitter）社交平台" },
-            { id: 1026, name: "M365Copilot", url: "https://m365.cloud.microsoft/chat", remark: "Microsoft 365 Copilot" },
-            { id: 1027, name: "PS图像处理", url: "https://ps.gaoding.com/#/", remark: "在线 PS / 图片编辑" },
-            { id: 1028, name: "夸克网盘", url: "https://pan.quark.cn/", remark: "夸克云盘 / 文件存储" },
-            { id: 1029, name: "阿里云", url: "https://www.aliyun.com/", remark: "阿里云官方站点" },
-            { id: 1030, name: "腾讯云", url: "https://www.dnspod.com/", remark: "DNSPod / 腾讯云 DNS" },
-            { id: 1031, name: "Surface恢复镜像", url: "https://support.microsoft.com/zh-cn/surface-recovery-image", remark: "Surface 官方系统恢复镜像" },
-            { id: 1032, name: "正则表达式测试", url: "https://tool.oschina.net/regex", remark: "正则表达式在线测试" },
-            { id: 1033, name: "站长工具", url: "https://tool.chinaz.com/", remark: "SEO / 域名 / 网站分析工具" },
-            { id: 1034, name: "模型图标集", url: "https://lobehub.com/zh/icons", remark: "AI 模型 / 应用图标资源" },
-            { id: 1035, name: "阿里邮箱", url: "https://qiye.aliyun.com", icon: "alimail.webp", remark: "阿里云企业邮箱" },
-            { id: 1036, name: "豆包", url: "https://doubao.com", remark: "字节跳动 AI 助手" },
-            { id: 1037, name: "DeepSeek", url: "https://deepseek.com", remark: "DeepSeek 官方 AI" },
-            { id: 1038, name: "Cloudflare", url: "https://www.cloudflare.com", remark: "CDN / DNS / WAF / Zero Trust" },
-            { id: 1039, name: "Resend", url: "https://www.resend.com", remark: "开发者邮件发送服务" },
-            { id: 1040, name: "Emailjs", url: "https://www.emailjs.com/", remark: "前端直连邮件服务" },
-            { id: 1041, name: "Outlook", url: "https://www.outlook.com", remark: "微软 Outlook 邮箱" },
-            { id: 1042, name: "QQ邮箱", url: "https://mail.qq.com", remark: "腾讯 QQ 邮箱" },
-            { id: 1043, name: "图片转换webp", url: "https://tinypng.com/", remark: "图片压缩 / WebP 转换" },
-            { id: 1044, name: "免费图片下载", url: "https://pixabay.com/zh/", remark: "免费可商用图片素材" },
-            { id: 1045, name: "ipApi", url: "https://ip-api.com/", remark: "IP / ASN / 地理位置 API" },
-            { id: 1046, name: "菜鸟教程", url: "https://www.runoob.com/", remark: "编程基础 / 快速参考" },
-            { id: 1047, name: "Qwerty Learner", url: "https://qwerty.kaiyi.cool/", remark: "免费开源英语学习工具" }
-        ];
-        
-        const localSites = JSON.parse(localStorage.getItem('cfg_vfinal_sites')) || [];
-        const sites = [...fixedSites, ...localSites];
-        
-        document.getElementById('site-list').innerHTML = sites.map(s => {
-            const isFixed = s.id >= 1000 && s.id <= 1100;
-            const btnHtml = isFixed ? '' : `
-                <div class="edit-btns">
-                    <button class="btn-sm btn-edit" onclick="openSiteModal(${s.id})">✎</button>
-                    <button class="btn-sm btn-del" onclick="removeData('cfg_vfinal_sites', ${s.id})">✕</button>
-                </div>`;
-            
-            // 核心：用JS截断文字为2行（每行最多12字）
-            const truncatedName = truncateText(s.name);
-            
-            return `
-            <div class="card" data-id="${s.id}" title="${s.remark || ''}">
-                ${btnHtml}
-                <div class="card-content">
-                    <div class="icon-circle" onclick="smartOpen('${s.url}', event)">
-                        <img src="${s.icon || 'https://www.google.com/s2/favicons?sz=64&domain='+s.url}">
-                    </div>
-                    <span class="site-name-text">${truncatedName}</span>
-                </div>
-            </div>`;
-        }).join('');
-        
-        bindUsageClickEvent();
-        applyUsageHighlight();
-        
-        initSortable();
-        
-        const hist = JSON.parse(localStorage.getItem('cfg_vfinal_hist')) || [];
-        document.getElementById('history-list').innerHTML = hist.map(h => {
-            const truncatedName = truncateText(h.name);
-            return `
-            <div class="card">
-                <div class="edit-btns">
-                    <button class="btn-sm btn-pin" onclick="pinHistory(${h.id})">📌</button>
-                    <button class="btn-sm btn-del" onclick="removeData('cfg_vfinal_hist', ${h.id})">✕</button>
-                </div>
-                <div class="card-content">
-                    <div class="icon-circle" style="background:rgba(255,255,255,0.05)" onclick="smartOpen('${h.url}', event)">🕒</div>
-                    <span class="site-name-text" style="opacity: 0.7; font-size: 11px;">${truncatedName}</span>
-                </div>
-            </div>`;
-        }).join('');
+    // ==================== 数据文件（data/sites.js）读写 ====================
+    // 站点数据以文件为准：网页上的增删改会写回该文件，实现真正的永久保存。
+    // 读取顺序：本地缓存（离线可用）→ 数据文件；联网时优先拉取仓库最新版本。
+
+    let siteStore = null;          // [{ id, name, url, icon, remark }]
+    let categories = null;         // 预留：分类信息
+    let remoteUpdatedAt = null;    // 手改文件后，用于判断是否需要提示刷新
+
+    // 从 window.NAV_SITES（data/sites.js）读取
+    function readSitesFromFile() {
+        const payload = window.NAV_SITES;
+        if (!payload) return null;
+
+        const list = Array.isArray(payload) ? payload : payload.sites;
+        if (!Array.isArray(list)) return null;
+
+        categories = categories || (payload && payload.categories) || null;
+        return list;
     }
 
-    // 应用背景
+    // 归一化：补齐 id、规范化 url/icon、去重
+    function normalizeSites(list) {
+        const seen = new Set();
+        const out = [];
+
+        (Array.isArray(list) ? list : []).forEach(raw => {
+            if (!raw || typeof raw !== 'object') return;
+
+            const name = String(raw.name || '').trim();
+            const url = normalizeUrl(raw.url);
+            if (!name || !url) return;
+
+            let id = Number.isFinite(Number(raw.id)) ? Number(raw.id) : null;
+            if (id === null || seen.has(String(id))) id = newId();
+            seen.add(String(id));
+
+            out.push({
+                id: id,
+                name: name,
+                url: url,
+                icon: sanitizeIconUrl(raw.icon),
+                remark: String(raw.remark || '').trim()
+            });
+        });
+
+        return out;
+    }
+
+    // 生成 data/sites.js 的文件内容
+    function buildDataFileContent(sites) {
+        const payload = {
+            updatedAt: new Date().toISOString(),
+            categories: categories,
+            sites: sites
+        };
+
+        const header = [
+            '// ===================================================================',
+            '// NavHub 站点数据文件（永久保存的站点列表）',
+            '//',
+            '// · 网页上「添加 / 编辑 / 删除 / 拖拽排序」站点后会自动写回本文件',
+            '// · 也可以直接手工编辑本文件，保存后刷新页面即可生效',
+            '// · 每项格式：{ id, name, url, icon, remark }',
+            '//   - id     : 唯一编号，请勿重复',
+            '//   - icon   : 可选，自定义图标地址；留空则自动获取站点图标',
+            '//   - remark : 可选，鼠标悬停显示的备注',
+            '// ==================================================================='
+        ].join('\n');
+
+        return header + '\nwindow.NAV_SITES = ' + JSON.stringify(payload, null, 4) + ';\n';
+    }
+
+    // 加载数据：优先用仓库最新版本，失败则回退本地缓存与打包文件
+    async function loadSites() {
+        const cfg = getSyncConfig();
+
+        // 1) 已配置同步：尝试从 GitHub 拉取最新数据文件（云端为准）
+        if (cfg.repo && cfg.token) {
+            try {
+                const res = await fetch(dataFileApiUrl(cfg, true), { headers: authHeaders(cfg) });
+                if (res.ok) {
+                    const content = decodeBase64Utf8((await res.json()).content || '');
+                    const parsed = extractSitesFromFileText(content);
+                    if (parsed && parsed.sites && parsed.sites.length) {
+                        siteStore = normalizeSites(parsed.sites);
+                        markFileTimestamp(parsed.updatedAt);
+                        cacheSites();
+                        console.info('[NavHub] 已从 GitHub 载入最新站点数据');
+                        return siteStore;
+                    }
+                } else if (res.status === 401 || res.status === 403) {
+                    setSyncStatus('令牌无效或权限不足，已改用本地数据', 'err', 6000);
+                } else if (res.status === 404) {
+                    setSyncStatus('仓库中未找到 data/sites.js，请先创建该文件', 'err', 6000);
+                }
+            } catch (e) {
+                console.warn('[NavHub] 云端数据拉取失败，改用本地数据:', e);
+            }
+        }
+
+        const cached = readJSON(SITES_KEY, null);
+        const hasCache = Array.isArray(cached) && cached.length > 0;
+
+        // 2) 升级迁移：旧版本的缓存里只有「用户自定义站点」，内置站点还硬编码在页面里。
+        //    首次运行新版时把数据文件与旧缓存合并，避免内置站点与用户数据丢失。
+        if (hasCache && !getFileTimestamp()) {
+            const fileSites = readSitesFromFile();
+            if (fileSites && fileSites.length) {
+                siteStore = normalizeSites(mergeSiteLists(fileSites, cached));
+                markFileTimestamp(window.NAV_SITES && window.NAV_SITES.updatedAt);
+                cacheSites();
+                console.info('[NavHub] 已完成数据迁移：数据文件 + 旧本地缓存');
+                return siteStore;
+            }
+        }
+
+        // 3) 数据文件被手工编辑或从别处更新过（updatedAt 变化）→ 以文件为准
+        if (window.NAV_SITES && window.NAV_SITES.updatedAt && window.NAV_SITES.updatedAt !== getFileTimestamp()) {
+            const fromFile = readSitesFromFile();
+            if (fromFile && fromFile.length) {
+                siteStore = normalizeSites(fromFile);
+                markFileTimestamp(window.NAV_SITES.updatedAt);
+                cacheSites();
+                return siteStore;
+            }
+        }
+
+        // 4) 已有本地缓存 → 直接使用（可能包含尚未同步成功的改动）
+        if (hasCache) {
+            siteStore = normalizeSites(cached);
+            return siteStore;
+        }
+
+        // 5) 首次运行：把打包文件里的站点写入缓存
+        const fromFile = readSitesFromFile();
+        if (fromFile && fromFile.length) {
+            siteStore = normalizeSites(fromFile);
+            markFileTimestamp(window.NAV_SITES && window.NAV_SITES.updatedAt);
+            cacheSites();
+            return siteStore;
+        }
+
+        // 6) 数据文件缺失（例如未部署 data/ 目录）
+        siteStore = [];
+        if (!window.__DATA_LOAD_FAILED__) {
+            console.warn('[NavHub] 未找到站点数据文件，站点列表为空');
+        }
+        return siteStore;
+    }
+
+    // 合并两份站点列表：以 id 与名称去重，后一份优先（用于旧缓存迁移）
+    function mergeSiteLists(baseList, overrideList) {
+        const out = [];
+        const seenIds = new Set();
+        const seenNames = new Set();
+
+        const push = list => {
+            (Array.isArray(list) ? list : []).forEach(s => {
+                if (!s || typeof s !== 'object') return;
+
+                const name = String(s.name || '').trim();
+                if (!name) return;
+
+                const idText = (s.id === undefined || s.id === null) ? '' : String(s.id);
+                if (idText && seenIds.has(idText)) return;
+                if (!idText && seenNames.has(name)) return;
+
+                if (idText) seenIds.add(idText);
+                seenNames.add(name);
+                out.push(s);
+            });
+        };
+
+        push(overrideList);
+        push(baseList);
+        return out;
+    }
+
+    // 记录数据文件的时间戳，用于识别文件被手工改动过
+    function getFileTimestamp() {
+        return localStorage.getItem(FILE_TS_KEY) || '';
+    }
+
+    function markFileTimestamp(ts) {
+        if (ts) localStorage.setItem(FILE_TS_KEY, String(ts));
+    }
+
+    // 从 data/sites.js 的文本内容中解析出站点数组
+    function extractSitesFromFileText(text) {
+        const idx = text.indexOf('window.NAV_SITES');
+        if (idx === -1) return null;
+
+        const braceIdx = text.indexOf('{', idx);
+        if (braceIdx === -1) return null;
+
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = braceIdx; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) { endIdx = i; break; }
+            }
+        }
+        if (endIdx === -1) return null;
+
+        try {
+            const payload = JSON.parse(text.slice(braceIdx, endIdx + 1));
+            categories = payload.categories || categories;
+            const list = Array.isArray(payload.sites) ? payload.sites : null;
+            return list ? { sites: list, updatedAt: payload.updatedAt || null } : null;
+        } catch (e) {
+            console.warn('[NavHub] 数据文件解析失败:', e);
+            return null;
+        }
+    }
+
+    function cacheSites() {
+        localStorage.setItem(SITES_KEY, JSON.stringify(siteStore));
+    }
+
+    // ==================== GitHub 云同步 ====================
+    function getSyncConfig() {
+        const saved = readJSON(SYNC_KEY, null) || {};
+        return {
+            repo: String(saved.repo || CONFIG.sync.repo || '').trim(),
+            branch: String(saved.branch || CONFIG.sync.branch || 'main').trim(),
+            token: String(saved.token || '').trim(),
+            path: CONFIG.sync.path
+        };
+    }
+
+    function isSyncEnabled() {
+        const cfg = getSyncConfig();
+        return !!(cfg.repo && cfg.token);
+    }
+
+    function authHeaders(cfg) {
+        return {
+            'Authorization': 'Bearer ' + cfg.token,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        };
+    }
+
+    function dataFileApiUrl(cfg, withRef) {
+        const base = `https://api.github.com/repos/${cfg.repo}/contents/${cfg.path}`;
+        return withRef ? `${base}?ref=${encodeURIComponent(cfg.branch)}` : base;
+    }
+
+    // UTF-8 安全的 Base64 编码（分块处理，避免站点很多时超出调用栈）
+    function encodeBase64Utf8(str) {
+        const bytes = new TextEncoder().encode(str);
+        const CHUNK = 0x8000;
+        let binary = '';
+
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+        }
+        return btoa(binary);
+    }
+
+    function decodeBase64Utf8(b64) {
+        const clean = String(b64 || '').replace(/\s/g, '');
+        const binary = atob(clean);
+        const bytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new TextDecoder().decode(bytes);
+    }
+
+    // 页面底部状态提示
+    let syncStatusTimer;
+    function setSyncStatus(text, kind, timeout) {
+        const el = document.getElementById('sync-status');
+        if (!el) return;
+
+        el.textContent = text || '';
+        el.className = (kind === 'ok' ? 'sync-ok' : kind === 'warn' ? 'sync-warn' : kind === 'err' ? 'sync-err' : '');
+        el.classList.toggle('on', !!text);
+
+        clearTimeout(syncStatusTimer);
+        if (text && timeout) {
+            syncStatusTimer = setTimeout(() => {
+                el.textContent = '';
+                el.classList.remove('on');
+            }, timeout);
+        }
+    }
+
+    // 把当前站点列表提交到 GitHub（带重试与冲突自动合并）
+    async function pushSitesToGitHub(sites, attempt = 1) {
+        const cfg = getSyncConfig();
+        if (!isSyncEnabled()) return false;
+
+        const content = buildDataFileContent(sites);
+        const url = dataFileApiUrl(cfg, false);
+        const headers = authHeaders(cfg);
+
+        try {
+            // 取得当前文件的 SHA（GitHub 更新文件必须提供）
+            let sha = null;
+            const head = await fetch(`${url}?ref=${encodeURIComponent(cfg.branch)}`, { headers });
+            if (head.ok) {
+                sha = (await head.json()).sha || null;
+            } else if (head.status !== 404) {
+                throw new Error(`读取远端文件失败（${head.status}）`);
+            }
+
+            const body = {
+                message: `chore(nav): 更新站点数据（${new Date().toLocaleString('zh-CN')}）`,
+                content: encodeBase64Utf8(content),
+                branch: cfg.branch
+            };
+            if (sha) body.sha = sha;
+
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { ...headers, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                setSyncStatus('☁️ 已同步到仓库', 'ok', 3000);
+                return true;
+            }
+
+            // 409：远端已被改动（例如手机上刚改过），重新读取后合并再提交一次
+            if (res.status === 409 && attempt <= 2) {
+                const latest = await fetch(`${url}?ref=${encodeURIComponent(cfg.branch)}`, {
+                    headers: { ...headers, 'Cache-Control': 'no-cache' }
+                });
+                if (latest.ok) {
+                    const remote = extractSitesFromFileText(decodeBase64Utf8((await latest.json()).content || ''));
+                    if (remote && remote.sites && remote.sites.length) {
+                        // 合并：远端有、本地没有的站点予以保留
+                        const localIds = new Set(sites.map(s => String(s.id)));
+                        const merged = sites.concat(
+                            normalizeSites(remote.sites).filter(s => !localIds.has(String(s.id)))
+                        );
+                        return pushSitesToGitHub(merged, attempt + 1);
+                    }
+                }
+                return pushSitesToGitHub(sites, attempt + 1);
+            }
+
+            const detail = await res.text().catch(() => '');
+            throw new Error(`提交失败（${res.status}）${detail.slice(0, 120)}`);
+
+        } catch (e) {
+            console.error('[NavHub] 云端同步失败:', e);
+            setSyncStatus('⚠️ 同步失败，已存本地', 'err', 6000);
+            return false;
+        }
+    }
+
+    // 站点数据变更后的统一入口：先存本地，再尝试同步到仓库
+    function persistSites() {
+        cacheSites();
+        if (isSyncEnabled()) {
+            setSyncStatus('☁️ 同步中…', 'warn');
+            pushSitesToGitHub(siteStore);
+        } else {
+            setSyncStatus('已存本地（云同步未开启）', 'warn', 4000);
+        }
+    }
+
+    // 打开云同步设置
+    function openSyncModal() {
+        const cfg = getSyncConfig();
+        const repoEl = document.getElementById('sync-repo');
+        const branchEl = document.getElementById('sync-branch');
+        const tokenEl = document.getElementById('sync-token');
+
+        if (repoEl) repoEl.value = cfg.repo;
+        if (branchEl) branchEl.value = cfg.branch;
+        if (tokenEl) tokenEl.value = cfg.token;
+
+        const stateEl = document.getElementById('sync-state-text');
+        if (stateEl) {
+            stateEl.textContent = isSyncEnabled()
+                ? '当前状态：已启用云同步，站点改动会自动提交到仓库。'
+                : '当前状态：未启用。站点改动只保存在本机浏览器，换设备或清缓存会丢失。';
+            stateEl.style.color = isSyncEnabled() ? '#34a853' : '#fbbc05';
+        }
+
+        openModal('sync-modal');
+    }
+
+    function saveSyncConfig() {
+        const repo = (document.getElementById('sync-repo').value || '').trim();
+        const branch = (document.getElementById('sync-branch').value || 'main').trim();
+        const token = (document.getElementById('sync-token').value || '').trim();
+
+        if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+            alert('仓库格式应为 owner/repo，例如 Codivs-Ctrl/WebNavHub');
+            return;
+        }
+        if (repo && !token) {
+            alert('启用云同步需要填写 GitHub 访问令牌');
+            return;
+        }
+
+        localStorage.setItem(SYNC_KEY, JSON.stringify({ repo, branch, token }));
+
+        alert(repo
+            ? '✅ 云同步已开启\n\n之后添加/修改站点会自动提交到 data/sites.js。\n本次已有数据可点「测试连接」旁的关闭后手动触发一次。'
+            : '已关闭云同步，站点改动只保存在本机浏览器。');
+
+        closeModal('sync-modal');
+
+        // 开启后立即把当前数据同步一次
+        if (repo && token) {
+            siteStore = siteStore || [];
+            setSyncStatus('☁️ 正在初始化云端数据…', 'warn');
+            pushSitesToGitHub(siteStore);
+        }
+    }
+
+    async function testSyncConnection() {
+        const repo = (document.getElementById('sync-repo').value || '').trim();
+        const branch = (document.getElementById('sync-branch').value || 'main').trim();
+        const token = (document.getElementById('sync-token').value || '').trim();
+        const btn = document.getElementById('sync-test-btn');
+
+        if (!repo || !token) {
+            alert('请先填写仓库与访问令牌');
+            return;
+        }
+
+        const cfg = { repo, branch, token, path: CONFIG.sync.path };
+        if (btn) { btn.disabled = true; btn.textContent = '测试中…'; }
+
+        try {
+            const res = await fetch(dataFileApiUrl(cfg, true), { headers: authHeaders(cfg) });
+
+            if (res.status === 401) {
+                alert('❌ 令牌无效（401）\n\n请检查令牌是否复制完整、是否已过期。');
+            } else if (res.status === 403) {
+                alert('❌ 权限不足（403）\n\n该令牌缺少本仓库的 Contents 读写权限。');
+            } else if (res.status === 404) {
+                alert(`❌ 找不到文件 ${CONFIG.sync.path}（404）\n\n请确认仓库名、分支名是否正确，以及该文件已存在于仓库中。`);
+            } else if (res.ok) {
+                alert('✅ 连接成功，令牌可用，可以正常同步。');
+            } else {
+                alert(`❌ 测试失败：HTTP ${res.status}`);
+            }
+        } catch (e) {
+            alert('❌ 无法连接 GitHub：' + (e && e.message ? e.message : e) + '\n\n请检查网络或代理设置。');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = '测试连接'; }
+        }
+    }
+
+    // 生成可直接粘贴回 data/sites.js 的代码（无令牌时的兜底方案）
+    function exportSitesCode() {
+        const text = buildDataFileContent(siteStore || []);
+        const ta = document.getElementById('code-output');
+        if (ta) ta.value = text;
+
+        openModal('code-modal');
+
+        const cfg = getSyncConfig();
+        if (cfg.repo && !isSyncEnabled()) {
+            setSyncStatus('未开启云同步，可用代码方式保存', 'warn', 4000);
+        }
+    }
+
+    function copySitesCode() {
+        const ta = document.getElementById('code-output');
+        if (!ta) return;
+
+        ta.select();
+        navigator.clipboard.writeText(ta.value)
+            .then(() => {
+                const btn = document.getElementById('copy-code-btn');
+                if (btn) {
+                    const old = btn.textContent;
+                    btn.textContent = '✅ 已复制';
+                    setTimeout(() => { btn.textContent = old; }, 2000);
+                }
+            })
+            .catch(() => alert('复制失败，请手动全选复制（Ctrl + A / Ctrl + C）'));
+    }
+
+    // 渲染导航站点
+    function render() {
+        const sites = Array.isArray(siteStore) ? siteStore : [];
+
+        const listEl = document.getElementById('site-list');
+        if (!listEl) return;
+
+        listEl.innerHTML = sites.map(s => {
+            const idText = (s.id === undefined || s.id === null) ? '' : String(s.id);
+            const canManage = idText !== '';
+
+            const btnHtml = canManage ? `
+                <div class="edit-btns">
+                    <button class="btn-sm btn-edit" data-action="edit-site" title="编辑">✎</button>
+                    <button class="btn-sm btn-del" data-action="delete-site" title="删除">✕</button>
+                </div>` : '';
+
+            const name = String(s.name || '');
+            const remark = String(s.remark || '');
+            const iconSrc = sanitizeIconUrl(s.icon) || faviconOf(s.url);
+
+            return `
+            <div class="card" data-id="${escapeHtml(idText)}" data-url="${escapeHtml(s.url || '')}"${remark ? ` title="${escapeHtml(remark)}"` : ''}>
+                ${btnHtml}
+                <div class="card-content">
+                    <div class="icon-circle">
+                        <img src="${escapeHtml(iconSrc)}" alt="${escapeHtml(name)}" loading="lazy">
+                    </div>
+                    <span class="site-name-text"${name.length > 16 ? ` title="${escapeHtml(name)}"` : ''}>${escapeHtml(truncateText(name))}</span>
+                </div>
+            </div>`;
+        }).join('');
+
+        initSortable();
+    }
+
+    // 应用背景（返回是否应用成功）
     function applyBg(value, type) {
         const body = document.body;
-        if (type === 'img') {
-            body.style.background = `#202124 url('${value}') no-repeat center center fixed`;
-            body.style.backgroundSize = 'cover';
-        } else if (type === 'color') {
+
+        if (type === 'color') {
+            if (!/^#[0-9a-f]{6}$/i.test(String(value))) return false;
             body.style.background = value;
             body.style.backgroundSize = 'auto';
+            localStorage.setItem(BG_KEY, value);
+            localStorage.setItem(BG_TYPE_KEY, 'color');
+            return true;
         }
-        localStorage.setItem('cfg_vfinal_bg', value);
-        localStorage.setItem('cfg_vfinal_bg_type', type);
+
+        const safe = sanitizeBgValue(value);
+        if (!safe) return false;
+
+        body.style.background = `#202124 url("${safe}") no-repeat center center fixed`;
+        body.style.backgroundSize = 'cover';
+        localStorage.setItem(BG_KEY, safe);
+        localStorage.setItem(BG_TYPE_KEY, 'img');
+        return true;
+    }
+
+    // ========== 全局事件绑定（统一委托，替代内联 onclick/onkeypress） ==========
+    function bindGlobalEvents() {
+        const engineSelect = document.getElementById('engine');
+        if (engineSelect) {
+            engineSelect.addEventListener('change', updateUI);
+        }
+
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    doSearch();
+                }
+            });
+        }
+
+        // 站点卡片：图标点击打开、编辑/删除按钮
+        const siteList = document.getElementById('site-list');
+        if (siteList) {
+            // 图标加载失败时降级为首字母占位，避免出现裂图
+            siteList.addEventListener('error', e => {
+                const img = e.target;
+                if (!img || img.tagName !== 'IMG') return;
+
+                const circle = img.closest('.icon-circle');
+                if (!circle) return;
+
+                const name = img.getAttribute('alt') || '';
+                img.remove();
+                const fallback = document.createElement('span');
+                fallback.textContent = (name.trim().charAt(0) || '?').toUpperCase();
+                fallback.style.fontSize = '18px';
+                fallback.style.fontWeight = 'bold';
+                fallback.style.opacity = '0.85';
+                circle.appendChild(fallback);
+            }, true);
+
+            siteList.addEventListener('click', e => {
+                const actionBtn = e.target.closest('[data-action]');
+                if (actionBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const card = actionBtn.closest('.card');
+                    const id = card ? card.getAttribute('data-id') : null;
+                    const action = actionBtn.getAttribute('data-action');
+
+                    if (action === 'edit-site' && id) openSiteModal(id);
+                    else if (action === 'delete-site' && id) removeData(SITES_KEY, id);
+                    return;
+                }
+
+                const icon = e.target.closest('.icon-circle');
+                if (!icon) return;
+
+                const card = icon.closest('.card');
+                const url = card ? card.getAttribute('data-url') : '';
+                recordUsage(url);
+                smartOpen(url, e);
+            });
+        }
+
+        // 最近搜索：重新搜索 / 删除 / 固定
+        const historyList = document.getElementById('history-list');
+        if (historyList) {
+            historyList.addEventListener('click', e => {
+                const actionEl = e.target.closest('[data-action]');
+                if (!actionEl) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const item = actionEl.closest('.history-item');
+                const id = item ? item.getAttribute('data-id') : null;
+                const action = actionEl.getAttribute('data-action');
+
+                if (action === 'search-history') fillAndSearch(actionEl.getAttribute('data-name'));
+                else if (action === 'delete-history' && id) deleteSingleHistory(id, e);
+                else if (action === 'pin-history' && id) pinHistory(id);
+            });
+        }
+
+        // Alt + S 切换搜索引擎
+        document.addEventListener('keydown', e => {
+            if (!e.altKey || !e.key) return;
+            if (e.key.toLowerCase() !== 's') return;
+
+            e.preventDefault();
+            const select = document.getElementById('engine');
+            if (!select) return;
+
+            const nextIndex = (engineKeys.indexOf(select.value) + 1) % engineKeys.length;
+            setEngine(engineKeys[nextIndex]);
+        });
     }
 
     // ========== 页面初始化 ==========
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+        bindGlobalEvents();
+        bindModalEvents();
+
         getDeviceInfo();
         manageMemo();
         refreshPublicIP();
-        
-        const bg = localStorage.getItem('cfg_vfinal_bg');
-        const type = localStorage.getItem('cfg_vfinal_bg_type');
-        if (bg) {
-            applyBg(bg, type);
+
+        // 背景数据损坏时清理掉，回到默认背景
+        const bg = localStorage.getItem(BG_KEY);
+        const type = localStorage.getItem(BG_TYPE_KEY);
+        if (bg && !applyBg(bg, type)) {
+            localStorage.removeItem(BG_KEY);
+            localStorage.removeItem(BG_TYPE_KEY);
         }
-        
+
         updateUI();
+
+        // 先用手头数据渲染，避免白屏；随后加载/拉取最新数据再刷新
+        const cachedSites = readJSON(SITES_KEY, null);
+        siteStore = Array.isArray(cachedSites) && cachedSites.length
+            ? normalizeSites(cachedSites)
+            : normalizeSites(readSitesFromFile() || []);
         render();
         renderHistory();
-        
-        document.addEventListener('keydown', e => {
-            if (e.altKey && e.key.toLowerCase() === 's') {
-                e.preventDefault();
-                const currentEngine = document.getElementById('engine').value;
-                let nextIndex = (engineKeys.indexOf(currentEngine) + 1) % engineKeys.length;
-                setEngine(engineKeys[nextIndex]);
-            }
-        });
+
+        await loadSites();
+        render();
+        renderHistory();
+
+        // 数据文件缺失时给出提示（例如忘记部署 data/ 目录）
+        if (!siteStore.length) {
+            setSyncStatus('未找到站点数据，请检查 data/sites.js', 'err');
+        }
     });
 </script>
 </body>
