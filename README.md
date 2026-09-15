@@ -43,7 +43,9 @@ WebNavHub/
 ├── data/
 │   └── sites.js              # 站点数据（永久保存的站点列表）
 ├── tools/
-│   └── sync-local.ps1        # 可选：本机数据文件与云端互同步脚本
+│   ├── sync-local.ps1        # 可选：Windows 下的数据文件与云端互同步脚本
+│   ├── sync-local.sh         # 可选：Linux / macOS / 树莓派 版同上
+│   └── deploy-pi.sh          # 可选：一键部署到树莓派（systemd 常驻 + 定时拉取）
 ├── image0.webp               # 默认背景
 ├── alimail.webp              # 阿里邮箱图标
 ├── google-brand-color.webp   # Google Logo
@@ -312,4 +314,92 @@ localStorage.clear(); location.reload();
 纯静态站点，将仓库推送到任意静态托管即可（Cloudflare Pages / Vercel / Netlify / GitHub Pages）。无需环境变量与构建命令。
 
 > ⚠️ 部署时必须包含 `data/` 目录，否则页面会提示「未找到站点数据」。若使用 Cloudflare Pages，注意不要用 `.gitignore` 排除该目录。
+
+### 部署到树莓派（自建服务器）
+
+想在树莓派上跑这个导航页，可用 `tools/deploy-pi.sh` 一键部署：它会把仓库克隆到 `/opt/WebNavHub`，起一个静态服务，并注册 systemd 服务实现**开机自启 + 定时从 GitHub 拉取更新 + 崩溃自重启**。
+
+**一键部署**
+
+```bash
+# 在树莓派上执行
+cd ~
+git clone https://github.com/Codivs-Ctrl/WebNavHub.git navhub-setup
+cd navhub-setup
+chmod +x tools/deploy-pi.sh
+./tools/deploy-pi.sh
+```
+
+看到 `✅ 部署完成！` 后会打印访问地址，通常是 `http://<树莓派IP>:8080/`。常用参数：
+
+```bash
+./tools/deploy-pi.sh --port 80              # 换端口（80 需额外授权，见下）
+./tools/deploy-pi.sh --dir ~/WebNavHub      # 换安装目录（默认 /opt/WebNavHub）
+./tools/deploy-pi.sh --pull-interval 60     # 每 60 秒 git pull 一次（默认 300）
+./tools/deploy-pi.sh --no-service           # 只准备文件，不装 systemd 服务
+```
+
+**它做了什么**
+
+| 项目 | 说明 |
+|---|---|
+| 代码目录 | `/opt/WebNavHub`（已存在且是 git 仓库时自动更新，不会重复克隆） |
+| 静态服务 | `python3 -m http.server 8080 --bind 0.0.0.0`，systemd 守护，`Restart=always` |
+| 自动更新 | `navhub-pull.timer` 定时执行 `git pull --rebase --autostash`，网页上同步进仓库的改动会自动落到树莓派 |
+| 开机自启 | 两个单元都已 `enable` |
+
+**管理命令**
+
+```bash
+sudo systemctl status  navhub              # 查看服务状态
+sudo systemctl restart navhub              # 重启
+sudo journalctl -u navhub -f               # 实时日志
+
+systemctl list-timers navhub-pull.timer    # 查看下次拉取时间
+sudo systemctl start navhub-pull.service   # 立刻手动拉取一次
+```
+
+**端口与访问**
+
+- 想让别的设备访问，树莓派防火墙需放行端口：`sudo ufw allow 8080/tcp`（或用 `sudo iptables -I INPUT -p tcp --dport 8080 -j ACCEPT`）。
+- 建议在路由器上给树莓派设**固定 IP**（或在 `raspi-config` 里配静态 IP），否则重启后地址可能变化。
+- 想直接用 `http://<树莓派IP>/`（80 端口）访问，需要给 python 绑定低端口的权限：
+
+  ```bash
+  sudo setcap 'cap_net_bind_service=+ep' "$(readlink -f "$(command -v python3)")"
+  ./tools/deploy-pi.sh --port 80
+  ```
+
+**提示**：树莓派上访问页面时，`http://<IP>:8080` 也是 `http://` 环境，所以「本机文件同步」可用——但请注意，此时写入的「本机文件」是**树莓派上**的 `data/sites.js`，与浏览器所在电脑的文件无关。
+
+### 只同步数据文件（不做部署）
+
+树莓派上已有一份代码，只想让它跟着仓库更新数据文件：
+
+```bash
+chmod +x tools/sync-local.sh
+
+./tools/sync-local.sh                  # 拉取一次（旧文件备份为 data/sites.js.bak）
+./tools/sync-local.sh --watch          # 每 30 秒检查一次
+./tools/sync-local.sh --watch -i 10    # 自定义间隔（秒）
+./tools/sync-local.sh --push           # 反向：本机改动提交并推送到仓库
+NAVHUB_TOKEN=github_pat_xxx ./tools/sync-local.sh   # 私有仓库需带令牌
+```
+
+配合 cron 每 5 分钟拉一次（无需常驻进程）：
+
+```bash
+crontab -e
+# 追加一行（路径换成你的实际路径）
+*/5 * * * * cd /home/pi/WebNavHub && ./tools/sync-local.sh >> /tmp/navhub-sync.log 2>&1
+```
+
+| 变量 | 说明 | 默认值 |
+|---|---|---|
+| `NAVHUB_REPO` | 仓库 `owner/repo` | `Codivs-Ctrl/WebNavHub` |
+| `NAVHUB_BRANCH` | 分支 | `main` |
+| `NAVHUB_PATH` | 仓库内路径 | `data/sites.js` |
+| `NAVHUB_LOCAL_FILE` | 本机写入路径 | 脚本上一级目录的 `data/sites.js` |
+| `NAVHUB_TOKEN` | 私有仓库令牌（Contents 读权限即可） | 空 |
+
 
