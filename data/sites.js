@@ -9,7 +9,7 @@
 //   - remark : 可选，鼠标悬停显示的备注
 // ===================================================================
 window.NAV_SITES = {
-    "updatedAt": "2026-09-15T17:35:29.943Z",
+    "updatedAt": "2026-09-15T17:55:11.472Z",
     "categories": null,
     "sites": [
         {
@@ -361,6 +361,13 @@ window.NAV_SITES = {
             "url": "https://javmix.tv/",
             "icon": "",
             "remark": "成人视频网站"
+        },
+        {
+            "id": 1691195457951,
+            "name": "444",
+            "url": "https://444",
+            "icon": "",
+            "remark": ""
         }
     ]
 };
